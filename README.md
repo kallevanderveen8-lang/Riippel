@@ -127,7 +127,9 @@ npm run test:browser
 
 GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, failed attempts, delays, pause/resume, daily sharing, 320/390 px portrait layouts, 844 px landscape, and 60/144 Hz peak equality.
 
-A desktop screenshot is included above. Final browser results are recorded in `reports/browser.json`. Viewport tests do not substitute for real iPhone/Android performance or Safari testing. Live monetization requires the CrazyGames preview/production environment.
+**Release QA passed:** 14 unit tests and all 11 browser check groups; zero browser errors. First contentful paint was **164 ms** in headless Chromium on GitHub Actions (not a universal network/device load guarantee). The blocked-SDK route was explicitly exercised. See [the successful run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39632741119) and `reports/browser.json`.
+
+Desktop, [portrait](docs/mobile.webp) and [landscape](docs/landscape.webp) screenshots were visually inspected. Short-viewport spacing was corrected so the pond and instructions stay above the footer. Viewport tests do not substitute for real iPhone/Android performance or Safari testing. Live monetization requires the CrazyGames preview/production environment.
 
 ## SDK and advertisement behavior
 
