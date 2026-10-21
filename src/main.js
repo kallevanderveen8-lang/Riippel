@@ -162,7 +162,8 @@ function point(e) { const r = canvas.getBoundingClientRect(); return { x: Math.r
 function edited() { wave.reset(); lit.fill(false); setInstruction(defaultInstruction()); touched = true; sound.place(); refresh(); save(); }
 canvas.addEventListener('pointerdown', e => {
   if (!level || phase !== 'ready' || paused() || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), index = stones.findIndex(s => distance2(p,s) <= C.touchRadius ** 2);
+  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), hitRadius = e.pointerType === 'touch' ? Math.max(C.touchRadius, 24 * C.size / canvas.getBoundingClientRect().width) : C.touchRadius;
+  let index = -1, nearest = hitRadius ** 2; stones.forEach((s,i) => { const d = distance2(p,s); if (d <= nearest) { index = i; nearest = d; } });
   pointer = { id: e.pointerId, start: p, index, original: index >= 0 ? {...stones[index]} : null, moved: false }; canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', e => {

@@ -68,6 +68,10 @@ export class Renderer {
       const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, radius * pulse);
       g.addColorStop(0, on ? '#ffd88d80' : '#e8c58924'); g.addColorStop(.3, on ? '#eebd5740' : '#ebc98710'); g.addColorStop(1, '#fbd47a00');
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(l.x, l.y, radius * pulse, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      if (!on && wave.stepNumber >= C.steps) {
+        const ratio = Math.min(1, wave.peak[Math.round(l.y) * C.size + Math.round(l.x)] / C.threshold);
+        ctx.beginPath(); ctx.arc(l.x,l.y,4.5,-Math.PI/2,-Math.PI/2 + ratio*Math.PI*2); ctx.lineWidth = .55; ctx.strokeStyle = '#d5c58b90'; ctx.stroke();
+      }
       ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(Math.PI / 4); ctx.fillStyle = on ? '#fbe1a4' : '#8f7953'; ctx.strokeStyle = on ? '#fff1c9' : '#c5ac75'; ctx.lineWidth = .35; ctx.shadowColor = '#ffcd71'; ctx.shadowBlur = on ? 3 * s : 0; ctx.fillRect(-1.4, -1.4, 2.8, 2.8); ctx.strokeRect(-1.4, -1.4, 2.8, 2.8); ctx.restore();
       ctx.beginPath(); ctx.ellipse(l.x, l.y + 3.1, 3.7, 1, 0, 0, Math.PI * 2); ctx.lineWidth = .2; ctx.strokeStyle = on ? '#fbe6ac55' : '#b8b98630'; ctx.stroke();
     });

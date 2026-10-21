@@ -27,7 +27,7 @@ export class Wave {
       this.down[i] = y < n - 1 && !this.walls[i + n] ? i + n : i;
     }
     for (let i = 0; i < len; i++) this.edgeMask[i] = this.walls[i] ? 2 : (this.left[i] === i || this.right[i] === i || this.up[i] === i || this.down[i] === i ? 1 : 0);
-    this.hasRocks = rocks.length > 0; this.stepNumber = 0; this.stones = [];
+    this.peakIndices = null; this.hasRocks = rocks.length > 0; this.stepNumber = 0; this.stones = [];
   }
   reset(stones = []) { this.h.fill(0); this.old.fill(0); this.next.fill(0); this.peak.fill(0); this.stepNumber = 0; this.stones = stones.map(s => ({ ...s })); }
   bump(s) {
@@ -45,7 +45,14 @@ export class Wave {
     for (let j = 0; j < this.stones.length; j++) if ((this.stones[j].delay || 0) * C.delaySteps === this.stepNumber) this.bump(this.stones[j]);
     const { h, old, next, peak, left, right, up, down, walls } = this;
     const mask = this.edgeMask, n = C.size;
-    for (let i = 0; i < h.length; i++) {
+    if (this.peakIndices) {
+      for (let i = 0; i < h.length; i++) {
+        if (mask[i] === 2) continue;
+        const neighbors = mask[i] === 0 ? h[i - 1] + h[i + 1] + h[i - n] + h[i + n] : h[left[i]] + h[right[i]] + h[up[i]] + h[down[i]];
+        next[i] = Math.fround((2 * h[i] - old[i] + C.c2 * (neighbors - 4 * h[i])) * C.damp);
+      }
+      for (const i of this.peakIndices) if (next[i] > peak[i]) peak[i] = next[i];
+    } else for (let i = 0; i < h.length; i++) {
       if (mask[i] === 2) continue;
       const neighbors = mask[i] === 0 ? h[i - 1] + h[i + 1] + h[i - n] + h[i + n] : h[left[i]] + h[right[i]] + h[up[i]] + h[down[i]];
       const value = Math.fround((2 * h[i] - old[i] + C.c2 * (neighbors - 4 * h[i])) * C.damp);
@@ -53,7 +60,7 @@ export class Wave {
     }
     this.old = h; this.h = next; this.next = old; this.stepNumber++;
   }
-  run(stones, steps = C.steps) { this.reset(stones); for (let i = 0; i < steps; i++) this.step(); return this.peak; }
+  run(stones, steps = C.steps, peakIndices = null) { this.peakIndices = peakIndices; this.reset(stones); for (let i = 0; i < steps; i++) this.step(); return this.peak; }
 }
 export function validPoint(p, rocks = [], margin = C.placementMargin) {
   if (p.x < margin || p.y < margin || p.x > C.size - 1 - margin || p.y > C.size - 1 - margin) return false;

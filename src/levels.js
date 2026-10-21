@@ -16,15 +16,19 @@ function randomStone(rng, rocks) {
 }
 export function candidatesFor(wave, solution, rocks, count, rng) {
   const all = wave.run(solution).slice(), single = new Float32Array(C.size * C.size);
-  for (const s of solution) {
-    const p = wave.run([s]);
-    for (let i = 0; i < p.length; i++) if (p[i] > single[i]) single[i] = p[i];
-  }
   const options = [];
   for (let y = C.wallMargin; y < C.size - C.wallMargin; y += 2) for (let x = C.wallMargin; x < C.size - C.wallMargin; x += 2) {
     const i = cell(x, y), p = { x, y };
-    if (all[i] >= C.marginAll * C.threshold && single[i] <= C.marginSingle * C.threshold && validPoint(p, rocks, C.wallMargin) && solution.every(s => distance2(p, s) >= C.lanternClearance ** 2)) options.push(p);
+    if (all[i] >= C.marginAll * C.threshold && validPoint(p, rocks, C.wallMargin) && solution.every(s => distance2(p, s) >= C.lanternClearance ** 2)) options.push(p);
   }
+  const indices = options.map(p=>cell(p.x,p.y));
+  // Solve every height cell as before, but track peaks only at cells that could
+  // become lanterns. This is exactly equivalent to filtering full peakSingle.
+  for (const s of solution) {
+    const p = wave.run([s], C.steps, indices);
+    for (const i of indices) if (p[i] > single[i]) single[i] = p[i];
+  }
+  for (let j = options.length - 1; j >= 0; j--) if (single[cell(options[j].x,options[j].y)] > C.marginSingle * C.threshold) options.splice(j,1);
   // Fisher–Yates (rather than engine-dependent random sort comparator).
   for (let i = options.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [options[i], options[j]] = [options[j], options[i]]; }
   const center = { x: (solution[0].x + solution[1].x) / 2, y: (solution[0].y + solution[1].y) / 2 };
