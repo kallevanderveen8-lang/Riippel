@@ -148,7 +148,7 @@ function tick(dt) {
 function frame(now) {
   const dt = Math.min(C.maxFrameDelta, (now - last) / 1000); last = now;
   if (level && !paused()) { accumulator += dt; while (accumulator >= 1 / C.tickHz) { tick(1 / C.tickHz); accumulator -= 1 / C.tickHz; } }
-  if (wave) {
+  if (wave && level) {
     const tutorialHints = level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures;
     const hints = phase === 'ready' ? level.solution.slice(0, tutorialHints ? level.solution.length : hintCount) : [];
     renderer.draw(wave, level, stones, lit, globalTime, phase === 'running' || phase === 'celebrate', hints, hover);

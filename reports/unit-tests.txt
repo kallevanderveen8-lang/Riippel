@@ -1,0 +1,26 @@
+
+> ripple-pond@1.0.0 test
+> node --test tests/*.test.mjs
+
+✔ star improvement and goal bonuses cannot be farmed by replay (1.729516ms)
+✔ daily UTC streak counts each day once and resets after a gap (0.240434ms)
+✔ corrupt saves recover and day rollover resets goals only (0.738175ms)
+✔ ads blocked in first three minutes and before five completes (1.699124ms)
+✔ successful reward pauses/mutes and resumes exactly once; cooldown prevents chain (0.463383ms)
+✔ unfilled and thrown errors resume without granting reward (0.511527ms)
+✔ no SDK remains fully safe and storage failures are contained (0.211756ms)
+✔ fixed grid, exact repeatability, finite long-run energy (358.04146ms)
+✔ one stone near / far calibration and constructive overlap (243.209966ms)
+✔ rock walls stay zero and reflective boundary uses own cell (62.328814ms)
+✔ delayed impulses enter only on their integer simulation step (18.545753ms)
+✔ all 10 authored onboarding solutions are valid and robust (532.476235ms)
+✔ generated level and UTC date seed are deterministic (601.420272ms)
+✔ sparse peak tracking is bit-identical to full-grid peaks at every candidate (106.270101ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2090.378088

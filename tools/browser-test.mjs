@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';import {createRequire} from 'node:module';import {spawn} from 'node:child_process';import {mkdirSync,writeFileSync} from 'node:fs';
 const require=createRequire(import.meta.url);let playwright;try{playwright=require('playwright');}catch{playwright=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright');}
-const server=spawn(process.execPath,['tools/serve.mjs'],{stdio:'pipe'});await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.on('error',reject);});
+const port=Number(process.env.TEST_PORT||4174), base=`http://localhost:${port}`;
+const server=spawn(process.execPath,['tools/serve.mjs'],{stdio:'pipe',env:{...process.env,PORT:String(port)}});await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.on('error',reject);});
 let browser,page;const errors=[],checks=[];mkdirSync('reports',{recursive:true});
 try{
  browser=await playwright.chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});page=await context.newPage();
  page.on('pageerror',e=>errors.push(e.message));await page.route('https://sdk.crazygames.com/**',r=>r.abort());
- await page.goto('http://localhost:4173/?test');await page.waitForFunction(()=>window.__ripple);
+ await page.goto(`${base}/?test`);await page.waitForFunction(()=>window.__ripple);
  const firstFrame=await page.evaluate(()=>performance.getEntriesByType('paint').find(p=>p.name==='first-contentful-paint')?.startTime??null);
  await page.screenshot({path:'reports/desktop.png'});checks.push('initial interactive pond, SDK blocked');
  const pond=page.locator('#pond');let bounds=await pond.boundingBox();await page.mouse.click(bounds.x+bounds.width*.5,bounds.y+bounds.height*.5);
@@ -16,9 +17,9 @@ try{
  for(let n=2;n<=10;n++){if(n>2)await page.evaluate(n=>window.__ripple.go(n),n);await page.evaluate(()=>window.__ripple.solve());await page.waitForFunction(()=>window.__ripple.state.phase==='complete');assert.equal(await page.evaluate(()=>window.__ripple.state.lit.every(Boolean)),true);}
  checks.push('all ten scripted ponds playable and completable');
  await page.evaluate(()=>window.__ripple.go(3));await page.evaluate(()=>window.__ripple.place([{x:36,y:64,delay:0}]));await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),1);checks.push('failed drop preserves stones and permits retry');
- await page.evaluate(()=>window.__ripple.go(15));await page.evaluate(()=>window.__ripple.place([{x:15,y:15,delay:0}]));bounds=await pond.boundingBox();await page.mouse.click(bounds.x+bounds.width*15/128,bounds.y+bounds.height*15/128);assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].delay),1);checks.push('delayed stone tap');
+ await page.evaluate(()=>window.__ripple.go(15));await page.waitForFunction(()=>window.__ripple.state.elapsed > .1);checks.push('frame loop survives asynchronous procedural level loading');await page.evaluate(()=>window.__ripple.place([{x:15,y:15,delay:0}]));bounds=await pond.boundingBox();await page.mouse.click(bounds.x+bounds.width*15/128,bounds.y+bounds.height*15/128);assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].delay),1);checks.push('delayed stone tap');
  await page.click('#pause');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);await page.click('#next');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('pause and resume');
- await page.evaluate(()=>window.__ripple.daily());console.log('DAILY before',JSON.stringify(await page.evaluate(()=>window.__ripple.state)));await page.evaluate(()=>window.__ripple.solve());console.log('DAILY dropped',JSON.stringify(await page.evaluate(()=>window.__ripple.state)));await page.waitForFunction(()=>window.__ripple.state.phase==='complete');await page.click('#copy');assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/^Ripple #/);checks.push('daily pond, streak, clipboard share');
+ await page.evaluate(()=>window.__ripple.daily());await page.evaluate(()=>window.__ripple.solve());await page.waitForFunction(()=>window.__ripple.state.phase==='complete');await page.click('#copy');assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/^Ripple #/);checks.push('daily pond, streak, clipboard share');
  for(const viewport of [{width:390,height:844},{width:320,height:568},{width:844,height:390}]){await page.setViewportSize(viewport);await page.evaluate(()=>window.__ripple.go(3));await page.screenshot({path:`reports/layout-${viewport.width}x${viewport.height}.png`});const layout=await page.evaluate(()=>{const r=document.querySelector('#drop').getBoundingClientRect();return {overflow:document.documentElement.scrollWidth>innerWidth,dropVisible:r.top>=0&&r.bottom<=innerHeight,dropHeight:r.height};});assert.equal(layout.overflow,false);assert.equal(layout.dropVisible,true);assert.ok(layout.dropHeight>=48);}
  checks.push('320px / 390px portrait and 844px landscape layout');
  // Same 360 simulation steps at 60 and 144 Hz, independent of render cadence.
