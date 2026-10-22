@@ -10,6 +10,7 @@ export function parseProgress(raw) {
     out.bonus = Math.max(0, Number(out.bonus) || 0); out.tokens = Math.max(0, Math.min(C.maxTokens, Math.floor(Number(out.tokens) || 0)));
     for (const key of ['stars','doubled','dailyResults','chapters','records']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
     if (!out.dailyTrail || !Array.isArray(out.dailyTrail.results)) out.dailyTrail = null;
+    else { out.dailyTrail.stage = Math.max(0, Math.min(C.dailyLength - 1, Math.floor(Number(out.dailyTrail.stage) || 0))); out.dailyTrail.results = out.dailyTrail.results.slice(0,C.dailyLength); }
     if (!out.goals || !Array.isArray(out.goals.solves) || !Array.isArray(out.goals.claimed)) out.goals = freshProgress().goals;
     rollDay(out); return out;
   } catch { return freshProgress(); }

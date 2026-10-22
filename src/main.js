@@ -63,7 +63,7 @@ async function enter(newMode = mode) {
   dailyDay = daySeed();
   dailyStage = mode === 'daily' ? (saved?.day === dailyDay ? Math.max(0, Math.min(C.dailyLength - 1, saved.stage || 0)) : dailyRun(progress, dailyDay).stage) : 0;
   const number = mode === 'daily' ? C.dailyLevels[dailyStage] : saved?.number || progress.level;
-  const restore = saved && (mode !== 'daily' || saved.day === dailyDay);
+  const restore = saved && (mode !== 'daily' || saved.day === dailyDay && Number.isInteger(saved.stage));
   const seed = mode === 'daily' ? (Math.imul(dailyDay, 2654435761) + dailyStage * 7919) >>> 0 : number * 7919;
   level = await fetchLevel(number, seed, mode === 'daily'); wave = new Wave(level.rocks);
   stones = restore && Array.isArray(saved.stones) ? saved.stones.slice(0, level.limit).map(s => ({ x: Math.round(Number(s.x)), y: Math.round(Number(s.y)), delay: Math.max(0, Math.min(C.maxDelay, Math.floor(Number(s.delay) || 0))) })).filter((s,i,all) => Number.isFinite(s.x) && Number.isFinite(s.y) && canPlace(s, level, all.slice(0,i))) : [];
@@ -104,7 +104,7 @@ function refresh() {
   $('sound').textContent = sound.muted || portal.muteAudio ? '♪̸' : '♫'; $('sound').setAttribute('aria-label', sound.muted ? 'Unmute sound' : 'Mute sound');
   $('pond-tag').textContent = `${C.themes[progress.theme].name.toUpperCase()} · ${phase === 'running' ? 'IN MOTION' : phase === 'complete' ? 'ALIGHT' : 'STILL'}`;
   const ads = portal.eligible(), canDouble = !manualPause && phase === 'complete' && !progress.doubled[rewardKey()];
-  $('hint').hidden = !(attempts >= C.hintFailures && phase === 'ready' && hintCount < level.solution.length);
+  $('hint').hidden = !(attempts >= C.hintFailures && phase === 'ready' && hintCount < level.solution.length && !(level.number >= 3 && level.number <= 5));
   $('hint').textContent = `Hint · ${progress.tokens}`;
   $('hint-token').disabled = progress.tokens < 1; $('hint-token').textContent = `Use 1 hint · Reveal a stone (${progress.tokens} left)`;
   $('hint-ad').hidden = !(ads && attempts >= C.rewardedFailures);
