@@ -1,19 +1,26 @@
 {
   "passed": true,
-  "firstContentfulPaintMs": 404,
+  "firstContentfulPaintMs": 172,
   "checks": [
     "initial interactive pond, SDK blocked",
     "pointer placement and mid-level restore",
-    "first pond solve, stars and goals",
-    "all ten scripted ponds playable and completable",
+    "first pond solve, stars and full-screen wave continuation",
+    "all ten scripted ponds completable; chapter rewards",
     "failed drop preserves stones and permits retry",
+    "earned hint dialog pauses and consumes exactly one token",
     "frame loop survives asynchronous procedural level loading",
     "delayed stone tap",
     "pause and resume",
     "collection drawer opens and resumes play",
-    "daily pond, streak, clipboard share",
-    "320px / 390px portrait and 844px landscape layout",
-    "60 / 144 Hz identical peak hash"
+    "three-stage UTC daily trail, reload restores mode/stage/stones, streak, clipboard share",
+    "replay keeps best stars without farming rewards",
+    "full-screen lake and 48px controls at all 10 CrazyGames sizes + 3 phone layouts",
+    "placement beyond old square; controls can move to expose covered water",
+    "60 / 144 Hz identical peak hash",
+    "SDK cloud-first restore, portal mute, Basic ad suppression, request/input shield and unfilled recovery"
   ],
-  "errors": []
+  "errors": [],
+  "testedCommit": "347600ec7468e48cec6a765f28ecaddd70f534bb",
+  "workflowRun": "https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39792903212",
+  "unitTestsPassed": 21
 }

@@ -50,7 +50,7 @@ Ponds 1–10 are fixed and verified. Pond 3 introduces interference; two failed 
 - Chapters contain five lakes. Finishing a chapter once awards three bonus stars and two hint credits. A compact chapter goal stays visible during play.
 - Best stone/drop records and a chapter-based level picker let players revisit unlocked lakes for three stars. Stars, chapter rewards and hint credits cannot be farmed by repeating a solve.
 - Each first solve earns one hint credit. Players begin with three. After two failed attempts, the Hint dialog offers a solution ring for one credit; after six failures, a player without credits can use free help.
-- The Daily Trail unlocks after lake 3: three lakes of increasing complexity (8/12/16), seeded by UTC date and stage. All players get identical geometry. Each stage saves independently; finishing all three grows the streak and grants two credits once.
+- The Daily Trail unlocks after lake 3: three lakes of increasing complexity (8/12/16), seeded by UTC date and stage. All players get identical geometry. Closing and reopening restores the active daily stage and placed stones. Each stage saves independently; finishing all three grows the streak and grants two credits once.
 - The daily share card reports up to 9 stars, total stones, and 3/3 lakes, with clipboard fallback. It contains no ad bonus stars.
 - Three daily goals with small bonuses; replaying a completed pond cannot repeatedly farm its stars or goals.
 - Local save in standalone mode. When the initialized CrazyGames SDK Data module is present, it becomes the save backend. Cloud data is read before writing; a late initialization reconciles earned progress.
@@ -132,7 +132,11 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, failed attempts, delays, pause/resume, daily sharing, 320/390 px portrait layouts, 844 px landscape, and 60/144 Hz peak equality.
+GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, chapter rewards, failed attempts, earned hints, delays, pause/resume, three daily stages, active-mode/stage/stone restore on reload, sharing, replay anti-farming, all ten CrazyGames frame sizes plus three phone layouts, full-screen pointer mapping, 60/144 Hz peak equality, and mocked SDK/cloud/ad/mute behavior.
+
+**Release validation:** 21 unit tests and all 16 Chromium browser check groups passed, with no browser errors. All ten required CrazyGames sizes plus three phone layouts passed. [Passing run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39792903212); exact tested commit and checks are in `reports/browser.json`. First contentful paint was 172 ms on this headless CI machine; this is not a universal phone/network guarantee. The Basic build is 98,515 bytes uncompressed / 32,847 bytes zipped.
+
+Inspected screenshots: [desktop](docs/desktop.webp), [phone](docs/mobile.webp), [landscape](docs/landscape.webp), [full-lake ripple](docs/waves-fullscreen.webp). The in-chat copy has separate local saves and no SDK/ad requests.
 
 ## CrazyGames integration (official docs checked 22 October 2026)
 
