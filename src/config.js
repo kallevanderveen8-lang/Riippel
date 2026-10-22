@@ -17,6 +17,6 @@ export const C = Object.freeze({
     { name: 'After the rain', base: [47, 67, 77], light: [39, 46, 48], accent: '#d8e1df', stone: '#7d8783', notes: [110, 164.81, 220], unlock: 20 },
     { name: 'Moonlit water', base: [25, 40, 58], light: [31, 40, 51], accent: '#d8dce3', stone: '#89939e', notes: [174.61, 261.63, 349.23], unlock: 30 }
   ],
-  audio: { master: 0.24, ambient: 0.025, chime: 0.18, splash: 0.10 },
-  render: { dpr: 2, waterResolution: 560, normalGain: 420, stoneVariants: 9, stoneTexture: 96, gravelCount: 1600, placedStoneRadius: 2.6 },
+  audio: { master: 0.24, ambient: 0.025, chime: 0.18, splash: 0.10, waterLoopSeconds: 4, waterLowpass: 650, waterBed: 0.055 },
+  render: { dpr: 2, waterResolution: 560, normalGain: 420, stoneVariants: 9, stoneTexture: 96, gravelCount: 1600, placedStoneRadius: 2.6, stoneMinPixels: 20, lanternMinPixels: 24 },
 });

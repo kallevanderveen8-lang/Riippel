@@ -51,7 +51,7 @@ export class Renderer {
     const compact = rect.width <= 750, landscape = rect.height <= 560 && rect.width > rect.height;
     const top = compact ? 141 : 104, bottom = 191;
     let size, x, y;
-    if (landscape) { size = Math.max(150, Math.min(rect.height - 100, rect.width - 310)); x = (rect.width - 250 - size) / 2; y = 65; }
+    if (landscape) { size = Math.max(150, Math.min(rect.height - 120, rect.width - 310)); x = (rect.width - 250 - size) / 2; y = 65; }
     else { size = Math.max(150, Math.min(rect.width - 24, rect.height - top - bottom)); x = (rect.width - size) / 2; y = top + Math.max(0, (rect.height - top - bottom - size) / 2); }
     this.view = { x, y, size };
     const scale = Math.min(1, C.render.waterResolution / Math.max(rect.width, rect.height));
@@ -114,7 +114,7 @@ export class Renderer {
   water(wave, time) {
     const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h, v = this.view;
     const sx = this.width / w, sy = this.height / h, inv = C.size / v.size, d = this.details, ref = this.reflection;
-    const t = this.reduced ? 0 : time, sines = this.sines, phase = t * 19, phase2 = t * 13;
+    const t = this.reduced ? 0 : time, sines = this.sines, phase = t * 117, phase2 = t * 83;
     for (let y = 0; y < h; y++) {
       const gy = (y * sy - v.y) * inv, iy = Math.floor(gy), fy = gy - iy;
       for (let x = 0; x < w; x++) {
@@ -129,11 +129,11 @@ export class Renderer {
           ny = mix(field[c + 128] - field[c - 128], field[c + 129] - field[c - 127], fx);
           const edge = clamp(Math.min(gx, gy, 127 - gx, 127 - gy) / 3); nx *= edge; ny *= edge;
         }
-        const wind1 = sines[(d[j + 4] * 31 + phase + d[j] * 220) & 2047];
-        const wind2 = sines[(d[j + 5] * 29 - phase2 + d[j + 1] * 180) & 2047];
+        const wind1 = sines[(d[j + 4] * 760 + phase + d[j] * 1200) & 2047];
+        const wind2 = sines[(d[j + 5] * 410 - phase2 + d[j + 1] * 700) & 2047];
         const ambient = wind1 * .7 + wind2 * .4;
         const normal = nx * .7 + ny * .9;
-        const light = clamp(normal * C.render.normalGain, -36, 50) + ambient * 3.5;
+        const light = clamp(normal * C.render.normalGain, -36, 50) + ambient * 5.5;
         const rx = Math.max(0, Math.min(w - 1, Math.round(x + nx * 70 + wind1 * 1.8)));
         const ry = Math.max(0, Math.min(h - 1, Math.round(y + ny * 70 + wind2 * 1.8)));
         const ri = (ry * w + rx) * 3, bi = (ry * w + rx) * 4;
@@ -179,7 +179,7 @@ export class Renderer {
     }
     stones.forEach((stone, i) => {
       const age = (wave.stepNumber - (stone.delay || 0) * C.delaySteps) / C.delaySteps, sinking = running && age >= 0;
-      const radius = C.render.placedStoneRadius;
+      const radius = Math.max(C.render.placedStoneRadius, C.render.stoneMinPixels / (2 * scale));
       ctx.save(); ctx.translate(stone.x, stone.y);
       if (sinking) ctx.globalAlpha = clamp(1 - age * 3.5, 0, 1);
       ctx.fillStyle = '#12232c77'; ctx.beginPath(); ctx.ellipse(.5, .8, radius * .9, radius * .65, -.3, 0, Math.PI * 2); ctx.fill();
@@ -202,6 +202,7 @@ export class Renderer {
   lantern(ctx, l, on, time, i, wave) {
     const bob = this.reduced ? 0 : Math.sin(time * 1.2 + i * 1.7) * .13;
     ctx.save(); ctx.translate(l.x, l.y + bob);
+    const objectScale = Math.max(1, C.render.lanternMinPixels / (5 * this.view.size / C.size)); ctx.scale(objectScale, objectScale);
     if (on) {
       const g = ctx.createRadialGradient(0, 0, .4, 0, 0, 12); g.addColorStop(0, '#edb65c57'); g.addColorStop(.25, '#d7aa5520'); g.addColorStop(1, '#dfb66700'); ctx.fillStyle = g; ctx.fillRect(-12, -12, 24, 24);
       // Broken amber reflections follow the surface, rather than a neon halo.

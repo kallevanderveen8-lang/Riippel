@@ -4,7 +4,7 @@ const port=Number(process.env.TEST_PORT||4174), base=`http://localhost:${port}`;
 const server=spawn(process.execPath,['tools/serve.mjs'],{stdio:'pipe',env:{...process.env,PORT:String(port)}});await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.on('error',reject);});
 let browser,page,sdkBlocked=0;const errors=[],checks=[];mkdirSync('reports',{recursive:true});
 try{
- browser=await playwright.chromium.launch({headless:true,args:['--no-sandbox']});
+ browser=await playwright.chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{}),args:['--no-sandbox']});
  const context=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});page=await context.newPage();
  page.on('pageerror',e=>errors.push(e.message));await page.route('https://sdk.crazygames.com/**',r=>{sdkBlocked++;return r.abort();});
  await page.goto(`${base}/?test&sdk`);await page.waitForFunction(()=>window.__ripple);
