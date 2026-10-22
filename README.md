@@ -2,7 +2,9 @@
 
 A calm wave-interference puzzle, built for HTML5 browsers with **Canvas 2D + vanilla JavaScript**. No framework, fonts, images, music files, runtime packages, or asset downloads. Water, lanterns, rocks, stones and particles are drawn in code; sound is synthesized with WebAudio.
 
-![Ripple desktop](docs/desktop.webp)
+The current visual direction is an immersive overhead lake: blue-grey sky reflections, refracted ripples, shallow gravel, mineral-textured stones, wet edges, shoreline reeds and wooden floating lanterns. All materials are generated and cached in Canvas; no external assets are needed. The lake fills the screen. Progression, daily goals and atmosphere selection are tucked into the Collection drawer.
+
+The four atmospheres are Morning lake, Evening light, After the rain, and Moonlit water. They change natural lighting instead of applying neon palettes.
 
 ## Play and upload
 
@@ -78,7 +80,7 @@ node tools/benchmark.mjs 30 48    # smaller/custom search
 node tools/script-levels.mjs     # rebuild fixed onboarding after intentional physics changes
 ```
 
-F3 toggles a debug overlay: level time, attempts, session drops, generation time, seed, step and lantern peaks versus threshold. F3 does not reveal a solution. The development-only `?test` harness is stripped by the build tool.
+F3 toggles a debug overlay: level time, attempts, session drops, generation time, seed, step and lantern peaks versus threshold. F3 does not reveal a solution. The full-screen scene has a square physical area centered between the header and controls. Pointer coordinates are mapped through `renderer.view`; in short landscape layouts this area moves to the left of the controls. A subtle boundary appears when hovering outside that area. The development-only `?test` harness is stripped by the build tool.
 
 ### Calibration
 
@@ -127,9 +129,9 @@ npm run test:browser
 
 GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, failed attempts, delays, pause/resume, daily sharing, 320/390 px portrait layouts, 844 px landscape, and 60/144 Hz peak equality.
 
-**Release QA passed:** 14 unit tests and all 11 browser check groups; zero browser errors. First contentful paint was **164 ms** in headless Chromium on GitHub Actions (not a universal network/device load guarantee). The blocked-SDK route was explicitly exercised. See [the successful run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39632741119) and `reports/browser.json`.
+**Previous visual release QA:** 14 unit tests and all 11 browser check groups; zero browser errors. First contentful paint was **164 ms** in headless Chromium on GitHub Actions (not a universal network/device load guarantee). The blocked-SDK route was explicitly exercised. See [the successful run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39632741119) and `reports/browser.json`.
 
-Desktop, [portrait](docs/mobile.webp) and [landscape](docs/landscape.webp) screenshots were visually inspected. Short-viewport spacing was corrected so the pond and instructions stay above the footer. Viewport tests do not substitute for real iPhone/Android performance or Safari testing. Live monetization requires the CrazyGames preview/production environment.
+The previous desktop, portrait and landscape screenshots in `docs/` are archived references and do not depict the new visual design. Current screenshots are produced by the latest Actions run. Short-viewport spacing was corrected so the pond and instructions stay above the footer. Viewport tests do not substitute for real iPhone/Android performance or Safari testing. Live monetization requires the CrazyGames preview/production environment.
 
 ## SDK and advertisement behavior
 

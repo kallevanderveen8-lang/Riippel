@@ -2,29 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#071819"><meta name="description" content="A quiet puzzle of stones, echoes, and little lights. Let your ripples meet.">
-<title>Ripple · a little wave goes a long way</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b272a'/%3E%3Ccircle cx='32' cy='32' r='21' fill='none' stroke='%2399d9c9'/%3E%3Ccircle cx='32' cy='32' r='12' fill='none' stroke='%2399d9c9'/%3E%3Ccircle cx='32' cy='32' r='4' fill='%23ffda96'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#253940"><meta name="description" content="A quiet lake. A handful of stones. Find the moment your ripples meet.">
+<title>Ripple</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23394b54'/%3E%3Cellipse cx='32' cy='34' rx='24' ry='12' fill='none' stroke='%23e4e3de' stroke-width='2'/%3E%3Cellipse cx='32' cy='31' rx='7' ry='5' fill='%238a8b82'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
-<header><a class="brand" href="./" aria-label="Ripple home"><span class="brand-mark">◎</span> ripple<span class="edition">A QUIET KIND OF PUZZLE</span></a><nav aria-label="Game controls"><button id="daily" class="nav-button" title="Daily Pond">☼ <span>Daily pond</span></button><button id="sound" class="icon-button" aria-label="Mute sound" title="Sound">♫</button><button id="pause" class="icon-button" aria-label="Pause game" title="Pause">Ⅱ</button></nav></header>
+<header>
+ <span class="brand" aria-label="Ripple">ripple<span class="brand-sub">STONES & STILL WATER</span></span>
+ <div class="pond-heading"><span id="level-label">LAKE 01</span><h1 id="level-name">A small beginning</h1></div>
+ <nav aria-label="Game controls"><button id="daily" class="nav-button" aria-label="Daily lake">Daily lake</button><button id="sound" class="icon-button" aria-label="Mute sound">♫</button><button id="pause" class="icon-button" aria-label="Pause game">Ⅱ</button></nav>
+</header>
 <main>
-<aside class="intro"><div class="eyebrow" id="chapter">THE FIRST RIPPLES</div><h1>A little wave.<br>A little wonder.</h1><p class="intro-text">Place your stones.<br>Let the ripples meet.<br>Bring the pond to light.</p><div class="chapter-rule"></div><div class="journey-label">YOUR JOURNEY <span id="journey-number">01 / ∞</span></div><div id="journey" class="journey" aria-label="Level progress"></div><p class="quiet-note">No clock. No rush.<br>Just one more ripple.</p></aside>
 <section class="game" aria-label="Ripple puzzle">
-<div class="pond-heading"><div><span class="eyebrow" id="level-label">POND 01</span><h2 id="level-name">A small beginning</h2></div><span id="par" class="par">PAR 1</span></div>
-<div id="pond-wrap"><canvas id="pond" aria-label="Pond: tap to place a stone, tap a stone to remove it, or drag to move it" tabindex="0"></canvas><div class="pond-corner top-left"></div><div class="pond-corner bottom-right"></div><div id="pond-tag">MOONWATER · STILL</div><div id="hint-finger" aria-hidden="true"><span></span>↓</div><div id="overlay" hidden><div class="overlay-inner"><div class="eyebrow" id="overlay-kicker"></div><div id="reward-stars"></div><h2 id="overlay-title"></h2><p id="overlay-text"></p><button id="next" class="primary">Next pond <span>→</span></button><button id="double" class="text-button" hidden>▷ Watch ad · Double star reward</button><button id="copy" class="text-button" hidden>Copy daily result ↗</button></div></div></div>
-<div class="pond-stats"><span><i class="stone-dot"></i><b id="stones-left">3</b> stones left</span><span id="lantern-status">☼ <b id="lit-count">0 / 1</b> lit</span><span id="attempt-label">Take your time</span></div>
-<div class="actions"><button id="reset" class="secondary">↺ <span>Reset</span></button><button id="drop" class="primary">DROP <span>↓</span></button></div>
-<p id="instruction" role="status" aria-live="polite">Tap to place a stone, then DROP</p><button id="hint" class="text-button" hidden>▷ Watch ad · Reveal one solution stone</button>
+ <div id="pond-wrap"><canvas id="pond" aria-label="Lake: tap to place a stone, tap a stone to remove it, or drag to move it" tabindex="0"></canvas>
+  <div id="hint-finger" aria-hidden="true"><span></span><i></i></div>
+  <div id="overlay" hidden><div class="overlay-inner"><div class="eyebrow" id="overlay-kicker"></div><div id="reward-stars"></div><h2 id="overlay-title"></h2><p id="overlay-text"></p><button id="next" class="primary">Next lake <span>→</span></button><button id="double" class="text-button" hidden>Watch ad · Double star reward</button><button id="copy" class="text-button" hidden>Copy daily result</button></div></div>
+ </div>
+ <div class="play-controls">
+  <p id="instruction" role="status" aria-live="polite">Place a stone on the water</p>
+  <div class="control-tray"><button id="reset" class="secondary" aria-label="Reset stones"><span class="reset-symbol" aria-hidden="true">↺</span><span>Reset</span></button><div class="stone-inventory"><div id="stone-tray" aria-hidden="true"></div><span><b id="stones-left">3</b> stones left</span></div><button id="drop" class="primary">Drop stones <span aria-hidden="true">↓</span></button></div>
+  <div class="pond-stats"><span id="lantern-status"><span class="lamp-icon" aria-hidden="true"></span><b id="lit-count">0 / 1</b> lanterns</span><span id="par">Par 1</span><span id="attempt-label">Take your time</span></div>
+  <button id="hint" class="text-button" hidden>Watch ad · Reveal one solution stone</button>
+ </div>
 </section>
-<aside class="collection"><div class="card"><div class="eyebrow">A LITTLE COLLECTION</div><div class="star-total"><span>✧</span> <b id="total-stars">0</b><small>stars gathered</small></div><div class="progress-track"><div id="theme-progress"></div></div><div class="progress-caption"><span id="next-theme">Violet dusk</span><span id="unlock-count">0 / 10</span></div><button id="themes" class="theme-preview"><span class="theme-orb"></span><span id="theme-name">Moonwater<small>Your pond</small></span><span>›</span></button></div>
-<div class="daily-goals"><div class="eyebrow">TODAY'S LITTLE GOALS <span>✧ +2 EACH</span></div><div id="goals"></div><button id="reroll" class="text-button" hidden>▷ Watch ad · Free goal reroll</button></div><div class="daily-teaser"><span class="sun-symbol">☼</span><div><b id="daily-title">A pond to share</b><p id="daily-teaser">Daily pond unlocks after pond 3.</p></div></div></aside>
 </main>
-<footer><span><i class="live-dot"></i> <span id="footer-theme">MOONWATER</span> <span class="footer-separator">/</span> HEADPHONES WELCOME</span><button id="collection-mobile" class="text-button">✧ <span id="mobile-stars">0</span> · Collection</button><span class="footer-right">SMALL STONES. BEAUTIFUL THINGS.</span></footer>
-</div>
-<dialog id="collection-dialog"><button id="close-dialog" class="icon-button" aria-label="Close collection">×</button><div class="eyebrow">MAKE YOURSELF AT HOME</div><h2>Your collection</h2><div id="theme-options"></div><div id="mobile-goals"></div></dialog>
+<footer><span id="footer-theme">MORNING LAKE</span><button id="collection-mobile" class="text-button">Collection <span class="collection-stars">✧ <span id="mobile-stars">0</span></span></button></footer>
+<dialog id="collection-dialog"><button id="close-dialog" class="icon-button" aria-label="Close collection">×</button><div class="eyebrow">YOUR LAKESIDE</div><h2>Small discoveries.</h2><div class="star-total"><b id="total-stars">0</b><span>stars collected</span></div><div class="progress-track"><div id="theme-progress"></div></div><div class="progress-caption"><span id="next-theme">Evening light</span><span id="unlock-count">0 / 10</span></div><button id="themes" class="theme-preview"><span id="theme-name">Morning lake</span><span>Change atmosphere ↓</span></button><div id="theme-options"></div><div class="daily-goals"><div class="eyebrow">TODAY'S GOALS · +2 STARS EACH</div><div id="goals"></div><button id="reroll" class="text-button" hidden>Watch ad · Free goal reroll</button></div><div class="daily-teaser"><b id="daily-title">A lake to share</b><p id="daily-teaser">Daily lake unlocks after lake 3.</p></div><div id="mobile-goals" hidden></div></dialog>
+<div hidden aria-hidden="true"><span id="chapter"></span><span id="journey-number"></span><div id="journey"></div><span id="pond-tag"></span></div>
 <pre id="debug" hidden></pre>
+</div>
 <script type="module" src="src/main.js"></script>
 </body></html>

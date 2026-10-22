@@ -40,10 +40,10 @@ function syncPause() {
   if (paused() || phase === 'complete') portal.stop(); else portal.start();
   last = performance.now(); accumulator = 0;
 }
-function applyTheme() { const theme = C.themes[progress.theme]; renderer.theme = theme; sound.muted = progress.muted; sound.setTheme(theme); sound.sync(); document.documentElement.style.setProperty('--accent', theme.accent); $('theme-name').replaceChildren(document.createTextNode(theme.name), Object.assign(document.createElement('small'), { textContent: 'Your pond' })); $('footer-theme').textContent = theme.name.toUpperCase(); }
+function applyTheme() { const theme = C.themes[progress.theme]; renderer.theme = theme; sound.muted = progress.muted; sound.setTheme(theme); sound.sync(); document.documentElement.style.setProperty('--accent', theme.accent); $('theme-name').replaceChildren(document.createTextNode(theme.name), Object.assign(document.createElement('small'), { textContent: 'Your lake' })); $('footer-theme').textContent = theme.name.toUpperCase(); }
 function setInstruction(text) { $('instruction').textContent = text; }
 function defaultInstruction() {
-  if (level.number === 1) return 'Tap to place a stone, then DROP';
+  if (level.number === 1) return 'Place a stone near the lantern. Then drop it.';
   if (level.number === 2) return 'One stone. Two little lights. Find the middle.';
   if (level.number === 3) return 'Place outside the gold circles. Let two waves meet.';
   if (level.number === 7) return 'Rocks send your ripples back. Listen for the echo.';
@@ -74,19 +74,20 @@ function renderGoals(target) {
 function refresh() {
   if (!level) return;
   const total = totalStars(progress), nextTheme = C.themes.find(t => t.unlock > total);
-  $('level-label').textContent = mode === 'daily' ? `DAILY POND · ${new Date(dailyDay * 86400000).toISOString().slice(0,10)}` : `POND ${String(level.number).padStart(2,'0')}`;
+  $('level-label').textContent = mode === 'daily' ? `DAILY LAKE · ${new Date(dailyDay * 86400000).toISOString().slice(0,10)}` : `LAKE ${String(level.number).padStart(2,'0')}`;
   $('level-name').textContent = level.name; $('par').textContent = `PAR ${level.par}`;
-  $('stones-left').textContent = level.limit - stones.length; $('lit-count').textContent = `${lit.filter(Boolean).length} / ${lit.length}`;
+  $('stones-left').textContent = level.limit - stones.length;
+  $('stone-tray').replaceChildren(...Array.from({length:level.limit},(_,i)=>{const stone=document.createElement('i');stone.className='inventory-stone'+(i<stones.length?' used':'');return stone;})); $('lit-count').textContent = `${lit.filter(Boolean).length} / ${lit.length}`;
   $('attempt-label').textContent = attempts ? `Drop ${attempts}` : 'Take your time'; $('drop').disabled = !stones.length || phase !== 'ready' || paused(); $('reset').disabled = !stones.length || phase !== 'ready' || paused();
   $('total-stars').textContent = $('mobile-stars').textContent = total;
-  $('next-theme').textContent = nextTheme ? `Next: ${nextTheme.name}` : 'All ponds unlocked'; $('unlock-count').textContent = nextTheme ? `${total} / ${nextTheme.unlock}` : '✧';
+  $('next-theme').textContent = nextTheme ? `Next: ${nextTheme.name}` : 'All lakes unlocked'; $('unlock-count').textContent = nextTheme ? `${total} / ${nextTheme.unlock}` : '✧';
   $('theme-progress').style.width = `${nextTheme ? (total % C.themeStars) / C.themeStars * 100 : 100}%`;
   $('journey-number').textContent = `${String(level.number).padStart(2,'0')} / ∞`;
   $('journey').replaceChildren(...Array.from({length:10},(_,i) => { const dot = document.createElement('i'), n = Math.floor((level.number - 1) / 10) * 10 + i + 1; dot.className = n < progress.level ? 'done' : n === level.number ? 'current' : ''; return dot; }));
   $('chapter').textContent = level.number < 7 ? 'THE FIRST RIPPLES' : level.number < 15 ? 'WHERE ECHOES MEET' : 'A MOMENT IN TIME';
-  $('daily').title = progress.level > C.dailyUnlock ? 'Play today’s shared pond' : 'Unlocks after pond 3';
-  $('daily-title').textContent = progress.level > C.dailyUnlock ? `${progress.streak || 0} day streak` : 'A pond to share';
-  $('daily-teaser').textContent = progress.level > C.dailyUnlock ? 'One new pond. Everyone, together.' : 'Daily pond unlocks after pond 3.';
+  $('daily').title = progress.level > C.dailyUnlock ? 'Play today’s shared lake' : 'Unlocks after lake 3';
+  $('daily-title').textContent = progress.level > C.dailyUnlock ? `${progress.streak || 0} day streak` : 'A lake to share';
+  $('daily-teaser').textContent = progress.level > C.dailyUnlock ? 'One new lake. Everyone, together.' : 'Daily lake unlocks after lake 3.';
   $('sound').textContent = sound.muted ? '♪̸' : '♫'; $('sound').setAttribute('aria-label', sound.muted ? 'Unmute sound' : 'Mute sound');
   $('pond-tag').textContent = `${C.themes[progress.theme].name.toUpperCase()} · ${phase === 'running' ? 'IN MOTION' : phase === 'complete' ? 'ALIGHT' : 'STILL'}`;
   const ads = portal.eligible(); $('hint').hidden = !(ads && attempts >= C.rewardedFailures && phase === 'ready' && hintCount < level.solution.length);
@@ -99,14 +100,14 @@ function refresh() {
 function overlay() {
   $('overlay').hidden = !manualPause && phase !== 'complete';
   if (manualPause) {
-    $('overlay-kicker').textContent = 'A MOMENT OF STILLNESS'; $('reward-stars').textContent = ''; $('overlay-title').textContent = 'Take your time.'; $('overlay-text').textContent = 'Your pond will be here.'; $('next').textContent = 'Resume →'; $('copy').hidden = true; $('double').hidden = true; return;
+    $('overlay-kicker').textContent = 'A MOMENT OF STILLNESS'; $('reward-stars').textContent = ''; $('overlay-title').textContent = 'Take your time.'; $('overlay-text').textContent = 'Your lake will be here.'; $('next').textContent = 'Resume →'; $('copy').hidden = true; $('double').hidden = true; return;
   }
   if (phase !== 'complete') return;
-  $('overlay-kicker').textContent = mode === 'daily' ? 'TODAY, TOGETHER' : 'A POND FULL OF LIGHT';
+  $('overlay-kicker').textContent = mode === 'daily' ? 'TODAY, TOGETHER' : 'A LAKE FULL OF LIGHT';
   $('reward-stars').textContent = '★'.repeat(result?.stars || 3) + '☆'.repeat(3 - (result?.stars || 3));
   $('overlay-title').textContent = result?.better ? 'Better than par!' : ['Beautifully done.', 'A little harmony.', 'Look what you started.'][level.number % 3];
-  $('overlay-text').textContent = `${stones.length} stone${stones.length === 1 ? '' : 's'} · ${attempts} drop${attempts === 1 ? '' : 's'} · +${result?.gained || 0} stars${mode === 'daily' ? `\n${progress.streak} day streak. See you tomorrow.` : level.number === 3 ? '\nDaily pond is now unlocked. A new pond, every day.' : '\nAnother quiet discovery awaits.'}`;
-  $('next').textContent = mode === 'daily' ? 'Back to your journey →' : 'Next pond →'; $('copy').hidden = mode !== 'daily';
+  $('overlay-text').textContent = `${stones.length} stone${stones.length === 1 ? '' : 's'} · ${attempts} drop${attempts === 1 ? '' : 's'} · +${result?.gained || 0} stars${mode === 'daily' ? `\n${progress.streak} day streak. See you tomorrow.` : level.number === 3 ? '\nDaily lake is now unlocked. A new lake, every day.' : '\nAnother quiet discovery awaits.'}`;
+  $('next').textContent = mode === 'daily' ? 'Back to your journey →' : 'Next lake →'; $('copy').hidden = mode !== 'daily';
 }
 function rewardKey() { return mode === 'daily' ? `d${dailyDay}` : `l${level.number}`; }
 function drop() {
@@ -152,17 +153,18 @@ function frame(now) {
     const tutorialHints = level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures;
     const hints = phase === 'ready' ? level.solution.slice(0, tutorialHints ? level.solution.length : hintCount) : [];
     renderer.draw(wave, level, stones, lit, globalTime, phase === 'running' || phase === 'celebrate', hints, hover);
+    $('hint-finger').style.left = `${renderer.view.x + renderer.view.size / 2}px`; $('hint-finger').style.top = `${renderer.view.y + renderer.view.size / 2}px`;
     $('hint-finger').classList.toggle('visible', level.number === 1 && mode === 'campaign' && stones.length === 0 && elapsed > 5 && phase === 'ready' && !paused());
-    if (debug) $('debug').textContent = `Ripple · ${mode}\nPond ${level.number} | ${phase}${paused() ? ' (paused)' : ''}\nAttempts ${attempts} | session drops ${drops}\nActive time ${elapsed.toFixed(1)} s\nGeneration ${level.generationMs.toFixed(1)} ms\nStep ${wave.stepNumber} / ${C.steps} | T ${C.threshold}\nPeaks ${level.lanterns.map(l => wave.peak[cell(l.x,l.y)].toFixed(4)).join(' / ')}\nFPS ~${Math.round(1 / Math.max(.001,dt))} | seed ${level.seed}`;
+    if (debug) $('debug').textContent = `Ripple · ${mode}\nLake ${level.number} | ${phase}${paused() ? ' (paused)' : ''}\nAttempts ${attempts} | session drops ${drops}\nActive time ${elapsed.toFixed(1)} s\nGeneration ${level.generationMs.toFixed(1)} ms\nStep ${wave.stepNumber} / ${C.steps} | T ${C.threshold}\nPeaks ${level.lanterns.map(l => wave.peak[cell(l.x,l.y)].toFixed(4)).join(' / ')}\nFPS ~${Math.round(1 / Math.max(.001,dt))} | seed ${level.seed}`;
   }
   if (++frameCount % C.tickHz === 0) { rollDay(progress); refresh(); }
   requestAnimationFrame(frame);
 }
-function point(e) { const r = canvas.getBoundingClientRect(); return { x: Math.round((e.clientX - r.left) / r.width * C.size), y: Math.round((e.clientY - r.top) / r.height * C.size) }; }
+function point(e) { return renderer.point(e.clientX, e.clientY); }
 function edited() { wave.reset(); lit.fill(false); setInstruction(defaultInstruction()); touched = true; sound.place(); refresh(); save(); }
 canvas.addEventListener('pointerdown', e => {
   if (!level || phase !== 'ready' || paused() || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), hitRadius = e.pointerType === 'touch' ? Math.max(C.touchRadius, 24 * C.size / canvas.getBoundingClientRect().width) : C.touchRadius;
+  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), hitRadius = e.pointerType === 'touch' ? Math.max(C.touchRadius, 24 * C.size / renderer.view.size) : C.touchRadius;
   let index = -1, nearest = hitRadius ** 2; stones.forEach((s,i) => { const d = distance2(p,s); if (d <= nearest) { index = i; nearest = d; } });
   pointer = { id: e.pointerId, start: p, index, original: index >= 0 ? {...stones[index]} : null, moved: false }; canvas.setPointerCapture(e.pointerId);
 });
@@ -182,7 +184,7 @@ canvas.addEventListener('pointerup', e => {
     else stones.splice(index,1);
     edited();
   } else if (!moved && stones.length < level.limit && canPlace(p,level,stones)) { stones.push({ ...p, delay:0 }); edited(); }
-  else if (!moved) setInstruction(stones.length >= level.limit ? 'No stones left. Move one, or tap it to remove.' : 'Try open water outside the gold circles and rocks.');
+  else if (!moved) setInstruction(stones.length >= level.limit ? 'No stones left. Move one, or tap it to remove.' : 'Place a stone in the open water near the lanterns.');
   pointer = null; if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointercancel', () => { if (pointer?.index >= 0) stones[pointer.index] = pointer.original; pointer = null; refresh(); });
@@ -200,10 +202,10 @@ $('next').onclick = async () => {
 };
 $('daily').onclick = async () => {
   if (paused() || phase === 'running' || phase === 'celebrate') return;
-  if (progress.level <= C.dailyUnlock) { setInstruction('Daily pond unlocks after pond 3. A little further…'); return; }
+  if (progress.level <= C.dailyUnlock) { setInstruction('Daily lake unlocks after lake 3. A little further…'); return; }
   await enter(mode === 'daily' ? 'campaign' : 'daily');
 };
-async function reward(action) { if (portal.busy) return; const success = await portal.ad('rewarded'); if (success) action(); else setInstruction('No ad available right now. Your pond is ready.'); refresh(); overlay(); save(); }
+async function reward(action) { if (portal.busy) return; const success = await portal.ad('rewarded'); if (success) action(); else setInstruction('No ad available right now. Your lake is ready.'); refresh(); overlay(); save(); }
 $('hint').onclick = () => reward(() => { hintCount = Math.min(level.solution.length,hintCount + 1); setInstruction('A faint ring marks one solution stone.'); });
 $('double').onclick = () => { const key = rewardKey(); if (progress.doubled[key]) return; reward(() => { if (progress.doubled[key]) return; progress.doubled[key] = true; progress.bonus += result.stars; result.gained += result.stars; }); };
 $('reroll').onclick = () => reward(() => { progress.goals.rerolled = true; progress.goals.solves = []; });
@@ -236,7 +238,7 @@ portal.init().then(async () => {
 });
 // Explicit test-only harness; production URL exposes no solution controls.
 if (new URLSearchParams(location.search).has('test')) window.__ripple = {
-  get state() { return {level,stones,lit,phase,attempts,progress,elapsed,paused:paused(),step:wave.stepNumber}; },
+  get state() { return {view:renderer.view,level,stones,lit,phase,attempts,progress,elapsed,paused:paused(),step:wave.stepNumber}; },
   solve() { stones = level.solution.map(s=>({...s})); edited(); drop(); },
   place(value) { stones = value; edited(); }, drop,
   async go(number) { progress.campaign = {number}; level = null; await enter('campaign'); },

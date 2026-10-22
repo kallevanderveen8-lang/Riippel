@@ -12,11 +12,11 @@ export const C = Object.freeze({
   winSeconds: 1.25, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, solverBudget: 24, benchmarkCount: 300,
   themes: [
-    { name: 'Moonwater', base: [7, 29, 37], light: [65, 183, 171], accent: '#a8e6d6', stone: '#e0eee5', notes: [130.81, 196, 261.63], unlock: 0 },
-    { name: 'Violet dusk', base: [23, 19, 43], light: [155, 110, 199], accent: '#cfb6f6', stone: '#e9dff9', notes: [146.83, 220, 293.66], unlock: 10 },
-    { name: 'Amber tide', base: [32, 25, 23], light: [194, 139, 64], accent: '#efd39c', stone: '#ffecd0', notes: [110, 164.81, 220], unlock: 20 },
-    { name: 'Blue hour', base: [10, 24, 48], light: [70, 143, 215], accent: '#a7d4ff', stone: '#d4eaff', notes: [174.61, 261.63, 349.23], unlock: 30 }
+    { name: 'Morning lake', base: [57, 79, 94], light: [34, 38, 40], accent: '#e8e2d4', stone: '#8d9084', notes: [130.81, 196, 261.63], unlock: 0 },
+    { name: 'Evening light', base: [65, 74, 80], light: [51, 42, 30], accent: '#e5d4b8', stone: '#948b79', notes: [146.83, 220, 293.66], unlock: 10 },
+    { name: 'After the rain', base: [47, 67, 77], light: [39, 46, 48], accent: '#d8e1df', stone: '#7d8783', notes: [110, 164.81, 220], unlock: 20 },
+    { name: 'Moonlit water', base: [25, 40, 58], light: [31, 40, 51], accent: '#d8dce3', stone: '#89939e', notes: [174.61, 261.63, 349.23], unlock: 30 }
   ],
   audio: { master: 0.24, ambient: 0.025, chime: 0.18, splash: 0.10 },
-  render: { dpr: 2, fieldGain: 180, normalGain: 360, particles: 24 },
+  render: { dpr: 2, waterResolution: 560, normalGain: 420, stoneVariants: 9, stoneTexture: 96, gravelCount: 1600, placedStoneRadius: 2.6 },
 });
