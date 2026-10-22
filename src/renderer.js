@@ -41,6 +41,7 @@ export class Renderer {
     this.rocks = Array.from({ length: C.render.stoneVariants }, (_, i) => stoneTexture(71 + i * 29, C.render.stoneTexture));
     this.sines = Float32Array.from({ length: 2048 }, (_, i) => Math.sin(i / 2048 * Math.PI * 2));
     this.view = { x: 0, y: 0, size: 1 };
+    this.normalX = new Float32Array(C.size * C.size); this.normalY = new Float32Array(C.size * C.size);
     new ResizeObserver(() => this.resize()).observe(canvas); this.resize();
   }
   resize() {
@@ -115,6 +116,10 @@ export class Renderer {
     const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h, v = this.view;
     const sx = this.width / w, sy = this.height / h, inv = C.size / v.size, d = this.details, ref = this.reflection;
     const t = this.reduced ? 0 : time, sines = this.sines, phase = t * 117, phase2 = t * 83;
+    // Interpolate all four normal samples, not just one axis: the fixed
+    // physical grid must not leave stair steps in the rendered highlights.
+    const normalX = this.normalX, normalY = this.normalY;
+    for (let y = 1; y < 127; y++) for (let x = 1; x < 127; x++) { const p = y * 128 + x; normalX[p] = field[p + 1] - field[p - 1]; normalY[p] = field[p + 128] - field[p - 128]; }
     for (let y = 0; y < h; y++) {
       const gy = (y * sy - v.y) * inv, iy = Math.floor(gy), fy = gy - iy;
       for (let x = 0; x < w; x++) {
@@ -125,15 +130,15 @@ export class Renderer {
           const c = iy * 128 + ix;
           const a = mix(field[c], field[c + 1], fx), b = mix(field[c + 128], field[c + 129], fx);
           height = mix(a, b, fy);
-          nx = mix(field[c + 1] - field[c - 1], field[c + 129] - field[c + 127], fy);
-          ny = mix(field[c + 128] - field[c - 128], field[c + 129] - field[c - 127], fx);
+          nx = mix(mix(normalX[c], normalX[c + 1], fx), mix(normalX[c + 128], normalX[c + 129], fx), fy);
+          ny = mix(mix(normalY[c], normalY[c + 1], fx), mix(normalY[c + 128], normalY[c + 129], fx), fy);
           const edge = clamp(Math.min(gx, gy, 127 - gx, 127 - gy) / 3); nx *= edge; ny *= edge;
         }
-        const wind1 = sines[(d[j + 4] * 760 + phase + d[j] * 1200) & 2047];
-        const wind2 = sines[(d[j + 5] * 410 - phase2 + d[j + 1] * 700) & 2047];
-        const ambient = wind1 * .7 + wind2 * .4;
+        const wind1 = sines[(d[j + 4] * 760 + phase + d[j] * 18000) & 2047];
+        const wind2 = sines[(d[j + 5] * 410 - phase2 + d[j + 1] * 11000) & 2047];
+        const ambient = wind1 * wind2 * .65 + wind1 * .24 + wind2 * .19;
         const normal = nx * .7 + ny * .9;
-        const light = clamp(normal * C.render.normalGain, -36, 50) + ambient * 5.5;
+        const light = clamp(normal * C.render.normalGain, -25, 35) + ambient * 5.5;
         const rx = Math.max(0, Math.min(w - 1, Math.round(x + nx * 70 + wind1 * 1.8)));
         const ry = Math.max(0, Math.min(h - 1, Math.round(y + ny * 70 + wind2 * 1.8)));
         const ri = (ry * w + rx) * 3, bi = (ry * w + rx) * 4;

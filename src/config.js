@@ -18,5 +18,5 @@ export const C = Object.freeze({
     { name: 'Moonlit water', base: [25, 40, 58], light: [31, 40, 51], accent: '#d8dce3', stone: '#89939e', notes: [174.61, 261.63, 349.23], unlock: 30 }
   ],
   audio: { master: 0.24, ambient: 0.025, chime: 0.18, splash: 0.10, waterLoopSeconds: 4, waterLowpass: 650, waterBed: 0.055 },
-  render: { dpr: 2, waterResolution: 560, normalGain: 420, stoneVariants: 9, stoneTexture: 96, gravelCount: 1600, placedStoneRadius: 2.6, stoneMinPixels: 20, lanternMinPixels: 24 },
+  render: { dpr: 2, waterResolution: 560, normalGain: 280, stoneVariants: 9, stoneTexture: 96, gravelCount: 1600, placedStoneRadius: 2.6, stoneMinPixels: 20, lanternMinPixels: 24 },
 });
