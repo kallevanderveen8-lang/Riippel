@@ -10,7 +10,7 @@ export const C = Object.freeze({
   themeStars: 10, hintFailures: 2, rewardedFailures: 3,
   firstAdSeconds: 180, adIntervalSeconds: 180, adEveryLevels: 5,
   adTimeoutMs: 90000, sdkTimeoutMs: 2500, saveKey: 'ripple-pond-v1',
-  winSeconds: 1.8, visualTailSteps: 720, chapterLength: 5, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, recordLimit: 300, maxTokens: 99, freeHelpFailures: 6, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchRadius: 5, dragThreshold: 2,
+  winSeconds: 1.8, visualTailSteps: 720, chapterLength: 5, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, recordLimit: 300, maxTokens: 99, freeHelpFailures: 6, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, solverBudget: 24, benchmarkCount: 300,
   themes: [
     { name: 'Morning lake', base: [57, 79, 94], light: [34, 38, 40], accent: '#e8e2d4', stone: '#8d9084', notes: [130.81, 196, 261.63], unlock: 0 },

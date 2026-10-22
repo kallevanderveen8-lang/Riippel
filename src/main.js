@@ -14,7 +14,7 @@ const portal = new Portal(state => {
   $('ad-shield').hidden = !state.busy; $('ad-shield').textContent = state.playing ? 'Advertisement' : 'Advertisement loading…';
   syncPause(); refresh();
 }, muted => { sound.portalMuted = muted; sound.sync(); refresh(); });
-let progress = parseProgress(portal.read()), mode = 'campaign', dailyDay = daySeed(), dailyStage = 0;
+let progress = parseProgress(portal.read()), mode = progress.mode, dailyDay = daySeed(), dailyStage = 0;
 let level, wave, stones = [], lit = [], phase = 'ready', attempts = 0, resetUsed = false, elapsed = 0, result = null, celebration = 0, hintCount = 0;
 let globalTime = 0, last = performance.now(), accumulator = 0, hover = null, pointer = null, debug = false, drops = 0, frameCount = 0;
 let worker, requestId = 0; const pending = new Map(), cache = new Map();
@@ -35,7 +35,7 @@ function fetchLevel(number, seed = number * 7919, daily = false) {
 function snapshot() { return { number: level.number, seed: level.seed, day: mode === 'daily' ? dailyDay : null, stage: dailyStage, stones, attempts, resetUsed, elapsed, hintCount, completed: phase === 'complete', result }; }
 function save() {
   if (level) progress[mode] = snapshot();
-  progress.muted = sound.muted;
+  progress.mode = mode; progress.muted = sound.muted;
   if (!portal.write(JSON.stringify(progress))) $('instruction').textContent = 'Saving is unavailable. You can keep playing.';
 }
 function paused() { return manualPause || hidden || adPaused || loading || $('collection-dialog').open || $('hint-dialog').open; }
@@ -193,8 +193,8 @@ function point(e) { return renderer.point(e.clientX, e.clientY); }
 function edited() { wave.reset(); lit.fill(false); setInstruction(defaultInstruction()); touched = true; sound.place(); refresh(); save(); }
 canvas.addEventListener('pointerdown', e => {
   if (!level || phase !== 'ready' || paused() || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), hitRadius = e.pointerType === 'touch' ? Math.max(C.touchRadius, 24 * C.size / renderer.view.size) : C.touchRadius;
-  let index = -1, nearest = hitRadius ** 2; stones.forEach((s,i) => { const d = distance2(p,s); if (d <= nearest) { index = i; nearest = d; } });
+  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), v = renderer.view, hitRadius = e.pointerType === 'touch' ? C.touchPixels / 2 : Math.max(C.mouseHitPixels, C.touchRadius * v.size / C.size);
+  let index = -1, nearest = hitRadius ** 2; stones.forEach((s,i) => { const d = ((p.x - s.x) * v.width / C.size) ** 2 + ((p.y - s.y) * v.height / C.size) ** 2; if (d <= nearest) { index = i; nearest = d; } });
   pointer = { id: e.pointerId, start: p, index, original: index >= 0 ? {...stones[index]} : null, moved: false }; canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', e => {
@@ -302,7 +302,7 @@ requestAnimationFrame(frame); await enter();
 portal.init().then(async () => {
   if (portal.sdk?.data) {
     const cloud = portal.initialData;
-    if (cloud && !touched) { progress = parseProgress(cloud); level = null; await enter(); }
+    if (cloud && !touched) { progress = parseProgress(cloud); mode = progress.mode; level = null; await enter(); }
     else if (cloud) { const remote = parseProgress(cloud); for (const [key,value] of Object.entries(remote.stars)) progress.stars[key] = Math.max(progress.stars[key] || 0, value); progress.level = Math.max(progress.level,remote.level); progress.bonus = Math.max(progress.bonus,remote.bonus); progress.doubled = {...remote.doubled,...progress.doubled}; progress.dailyResults = {...remote.dailyResults,...progress.dailyResults}; progress.chapters = {...remote.chapters,...progress.chapters}; progress.records = {...remote.records,...progress.records}; progress.tokens = Math.max(progress.tokens,remote.tokens); if (remote.lastDaily > progress.lastDaily) { progress.lastDaily = remote.lastDaily; progress.streak = remote.streak; } }
     portal.acceptData(); save();
   }

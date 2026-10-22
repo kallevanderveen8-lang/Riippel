@@ -1,11 +1,12 @@
 import { C } from './config.js';
 import { daySeed } from './simulation.js';
-export function freshProgress() { return { version: C.version, level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, records: {}, tokens: C.initialTokens, theme: 0, muted: false, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
+export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, records: {}, tokens: C.initialTokens, theme: 0, muted: false, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
 export function parseProgress(raw) {
   try {
     const p = JSON.parse(raw); if (!p || p.version !== C.version) return freshProgress();
     const out = { ...freshProgress(), ...p };
     out.level = Math.max(1, Math.min(10000, Math.floor(Number(out.level) || 1)));
+    out.mode = out.mode === 'daily' && out.level > C.dailyUnlock ? 'daily' : 'campaign';
     out.theme = Math.max(0, Math.min(C.themes.length - 1, Math.floor(Number(out.theme) || 0)));
     out.bonus = Math.max(0, Number(out.bonus) || 0); out.tokens = Math.max(0, Math.min(C.maxTokens, Math.floor(Number(out.tokens) || 0)));
     for (const key of ['stars','doubled','dailyResults','chapters','records']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
