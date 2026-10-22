@@ -1,6 +1,7 @@
 // Simulation and game tuning live here. Changing physics invalidates old puzzles.
 export const C = Object.freeze({
-  version: 1, size: 128, c2: 0.22, damp: 0.996, radius: 4, amplitude: 1,
+  version: 1, launchStage: 'basic',
+  chapters: ['First light', 'Stone & echo', 'A moment in time', 'Across the water', 'Quiet currents', 'Far shores'], size: 128, c2: 0.22, damp: 0.996, radius: 4, amplitude: 1,
   threshold: 0.065, steps: 360, tickHz: 60, stepsPerTick: 2,
   delaySteps: 120, maxDelay: 2, maxFrameDelta: 0.1,
   marginAll: 1.15, marginSingle: 0.7, wallMargin: 10, stoneMargin: 10,
@@ -9,7 +10,7 @@ export const C = Object.freeze({
   themeStars: 10, hintFailures: 2, rewardedFailures: 3,
   firstAdSeconds: 180, adIntervalSeconds: 180, adEveryLevels: 5,
   adTimeoutMs: 90000, sdkTimeoutMs: 2500, saveKey: 'ripple-pond-v1',
-  winSeconds: 1.25, touchRadius: 5, dragThreshold: 2,
+  winSeconds: 1.8, visualTailSteps: 720, chapterLength: 5, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, recordLimit: 300, maxTokens: 99, freeHelpFailures: 6, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, solverBudget: 24, benchmarkCount: 300,
   themes: [
     { name: 'Morning lake', base: [57, 79, 94], light: [34, 38, 40], accent: '#e8e2d4', stone: '#8d9084', notes: [130.81, 196, 261.63], unlock: 0 },

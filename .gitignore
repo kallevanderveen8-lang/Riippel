@@ -2,3 +2,5 @@ node_modules/
 dist/
 reports/*.png
 reports/*.log
+
+dist-full/

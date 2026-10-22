@@ -26,6 +26,8 @@ This creates:
 - `releases/ripple-crazygames.zip` — upload this ZIP to CrazyGames. `index.html` is at the ZIP root.
 - `reports/build.json` — measured compressed/uncompressed sizes.
 
+The default package is **Basic Launch**: all ad offers and requests are disabled. After CrazyGames invites the game to Full Launch, run `node tools/build.mjs --full` to create `dist-full/` and `releases/ripple-crazygames-full.zip`. Full Launch enables the guarded ad adapter; it does not bypass CrazyGames availability/cooldown decisions.
+
 To test exactly the production files: `node tools/serve.mjs dist`.
 
 In the CrazyGames submission, enable **Progress Save / Data Module**. Test the upload in the portal preview with SDK Inspector, an ad blocker, and normal/rewarded ad scenarios before submitting for review. The repository does not submit or publish the game to CrazyGames automatically.
@@ -45,13 +47,16 @@ Ponds 1–10 are fixed and verified. Pond 3 introduces interference; two failed 
 ## Progression
 
 - Four pond themes, unlocked at 0 / 10 / 20 / 30 stars, change the palette, stones and ambient chord.
-- The Daily Pond unlocks after pond 3. Its seed uses the UTC day; all players receive the same geometry, independent of their progression.
-- Daily streak and text share card with clipboard fallback.
+- Chapters contain five lakes. Finishing a chapter once awards three bonus stars and two hint credits. A compact chapter goal stays visible during play.
+- Best stone/drop records and a chapter-based level picker let players revisit unlocked lakes for three stars. Stars, chapter rewards and hint credits cannot be farmed by repeating a solve.
+- Each first solve earns one hint credit. Players begin with three. After two failed attempts, the Hint dialog offers a solution ring for one credit; after six failures, a player without credits can use free help.
+- The Daily Trail unlocks after lake 3: three lakes of increasing complexity (8/12/16), seeded by UTC date and stage. All players get identical geometry. Each stage saves independently; finishing all three grows the streak and grants two credits once.
+- The daily share card reports up to 9 stars, total stones, and 3/3 lakes, with clipboard fallback. It contains no ad bonus stars.
 - Three daily goals with small bonuses; replaying a completed pond cannot repeatedly farm its stars or goals.
 - Local save in standalone mode. When the initialized CrazyGames SDK Data module is present, it becomes the save backend. Cloud data is read before writing; a late initialization reconciles earned progress.
 - Mid-level placement, delays, attempts and completed reward screens survive reloads.
 
-The first pond is the initial screen: no menu or logo barrier. A pulsing placement cue appears after five seconds. Chimes, particles, a brief slow-motion/zoom finish and the daily-unlock reveal follow the player's actual actions. The requested 0:15 / 0:45 / 1:30 milestones are pacing targets, not forced timers. Browser autoplay restrictions mean sound starts with the first user gesture.
+The first pond is the initial screen: no menu or logo barrier. A pulsing placement cue appears after five seconds. Chimes, particles, a brief zoom finish and the daily-unlock reveal follow the player's actual actions. The requested 0:15 / 0:45 / 1:30 milestones are pacing targets, not forced timers. Browser autoplay restrictions mean sound starts with the first user gesture.
 
 ## Simulation and generation
 
@@ -80,7 +85,7 @@ node tools/benchmark.mjs 30 48    # smaller/custom search
 node tools/script-levels.mjs     # rebuild fixed onboarding after intentional physics changes
 ```
 
-F3 toggles a debug overlay: level time, attempts, session drops, generation time, seed, step and lantern peaks versus threshold. F3 does not reveal a solution. The full-screen scene has a square physical area centered between the header and controls. Pointer coordinates are mapped through `renderer.view`; in short landscape layouts this area moves to the left of the controls. A subtle boundary appears when hovering outside that area. The development-only `?test` harness is stripped by the build tool.
+F3 toggles a debug overlay: level time, attempts, session drops, generation time, seed, step and lantern peaks versus threshold. F3 does not reveal a solution. The fixed 128² lake projects across the **entire canvas**, with independent horizontal/vertical scale. Consequently circles project as ellipses on rectangular screens, while solutions and timing remain identical. Stones and lantern sprites retain their proportions. There is no hidden central play square. **Controls ↑ / ↓** moves the tray so every covered water cell remains accessible. A win stops scoring, but water keeps simulating to 720 steps to let waves travel to the shoreline; those extra visual steps never count toward solving a failed attempt. The development-only `?test` harness is stripped by the build tool.
 
 ### Calibration
 
@@ -129,23 +134,21 @@ npm run test:browser
 
 GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, failed attempts, delays, pause/resume, daily sharing, 320/390 px portrait layouts, 844 px landscape, and 60/144 Hz peak equality.
 
-**Natural-lake visual release QA passed:** 14 unit tests and all 12 browser check groups; zero browser errors. The full-screen lake, textured stones, new audio and Collection drawer were tested on desktop, 320/390 px portrait and 844 px landscape layouts. Pointer-to-simulation mapping, all ten authored solutions, save restore, pause/resume and daily sharing passed. The last renderer revision removes grid stair steps from wave lighting. See [the passing run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39744359610) and `reports/browser.json`.
+## CrazyGames integration (official docs checked 22 October 2026)
 
-The current [desktop](docs/desktop.webp), [portrait](docs/mobile.webp) and [landscape](docs/landscape.webp) screenshots were inspected. First paint is a headless browser measurement, not a universal device/network guarantee. Live monetization still requires the CrazyGames preview/production environment.
+`src/sdk.js` loads the official v3 SDK asynchronously. It awaits `init()` with a timeout and only uses supported `local` / `crazygames` environments. A blocked or unavailable SDK leaves a playable local game. Loading events, gameplay start/stop, happytime, feedback context and a completion milestone (the first 30 lakes) are integrated. Tab hiding pauses local audio/physics, while the SDK handles its own tab lifecycle.
 
-## SDK and advertisement behavior
+- Basic Launch is the default and has **no monetization**. The separately built Full Launch package enables offers only when the SDK ad module is available and no adblock is detected.
+- No ad request in the first 180 seconds. A shared 180-second cooldown prevents ad chains. Midgame requests occur only on a first-completion result screen and at least five newly solved lakes apart.
+- Rewarded offers live in a paused hint/collection dialog or the result screen, with clear `Watch ad` labels. Continue/dismiss choices are immediately available and equally sized/styled. Hints, star doubling and a daily-goal reroll also have earned-credit alternatives.
+- All app input becomes inert from request through finish/error. Audio mutes on **adStarted**, not at request. Unfilled/error/throw/request timeout/playback timeout recover; callbacks received after completion are ignored. Only `adFinished` grants a reward once.
+- `game.settings.muteAudio` and its change listener override the in-game audio toggle. WebAudio also resumes from suspended/interrupted states on a user gesture.
+- After SDK initialization, Data is the exclusive backend. The initial cloud/guest read is captured before writes and reconciled before enabling writes. Standalone local progress can migrate on first use; the SDK handles guest/account switching and reload. Select **Yes, using the Data Module** in the submission.
+- No ads, trackers, third-party assets or network calls other than the official SDK. No Escape/Ctrl+W bindings.
 
-`src/sdk.js` loads the official v3 SDK only on a detected CrazyGames host/embed (or when explicitly testing with `?sdk`). Its failure, blocking or absence leaves the game usable. On the portal, gameplay events begin after SDK initialization and reflect placing, simulation, pauses and completion screens.
+Read [docs/crazygames-release.md](docs/crazygames-release.md) for the portal test checklist and retention measurement plan. Passing repository tests does not mean CrazyGames approval or proven retention. Real ads, guest/account sync and device audio interruptions need the portal preview and physical-device testing.
 
-- No ad requests for the first 180 seconds.
-- Midgame requests only at completion, at least five newly completed ponds apart.
-- Shared 180-second cooldown prevents midgame/rewarded chains.
-- Opt-in, labelled rewards: one solution ring, double a level's star reward once, or one daily-goal reroll.
-- Reward controls are hidden without an available SDK/ad module, with detected adblock, during cooldown, and after known monetization-disabled errors.
-- Pause and mute around requests; success, error, unfilled, thrown exceptions and timeout recover safely. Rewards only follow a finished callback and are guarded against duplicate callbacks.
-- Visibility/manual pause preserves the current attempt; no Escape or Ctrl+W game binding.
-
-Official integration references: [SDK introduction](https://docs.crazygames.com/sdk/intro/), [game events](https://docs.crazygames.com/sdk/game/), [video ads](https://docs.crazygames.com/sdk/video-ads/), [Data module](https://docs.crazygames.com/sdk/data/).
+Official references: [SDK initialization](https://docs.crazygames.com/sdk/intro/), [game events/settings](https://docs.crazygames.com/sdk/game/), [video ads](https://docs.crazygames.com/sdk/video-ads/), [advertisement requirements](https://docs.crazygames.com/requirements/ads/), [Data](https://docs.crazygames.com/sdk/data/), [quality](https://docs.crazygames.com/requirements/quality/), [gameplay/responsive sizes](https://docs.crazygames.com/requirements/gameplay/), [puzzle monetization](https://docs.crazygames.com/resources/monetizing-puzzle/).
 
 ## Implementation map
 

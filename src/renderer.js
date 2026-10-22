@@ -49,12 +49,9 @@ export class Renderer {
     if (!rect.width || !rect.height) return;
     this.width = rect.width; this.height = rect.height; this.dpr = dpr;
     this.canvas.width = Math.round(rect.width * dpr); this.canvas.height = Math.round(rect.height * dpr);
-    const compact = rect.width <= 750, landscape = rect.height <= 560 && rect.width > rect.height;
-    const top = compact ? 141 : 104, bottom = 191;
-    let size, x, y;
-    if (landscape) { size = Math.max(150, Math.min(rect.height - 120, rect.width - 310)); x = (rect.width - 250 - size) / 2; y = 65; }
-    else { size = Math.max(150, Math.min(rect.width - 24, rect.height - top - bottom)); x = (rect.width - size) / 2; y = top + Math.max(0, (rect.height - top - bottom - size) / 2); }
-    this.view = { x, y, size };
+    // One deterministic 128² physical lake covers the complete viewport.
+    // Resize changes only the projection, never the level or its wave solution.
+    this.view = { x: 0, y: 0, width: rect.width, height: rect.height, size: Math.min(rect.width, rect.height) };
     const scale = Math.min(1, C.render.waterResolution / Math.max(rect.width, rect.height));
     this.off.width = Math.ceil(rect.width * scale); this.off.height = Math.ceil(rect.height * scale);
     this.image = this.octx.createImageData(this.off.width, this.off.height);
@@ -62,7 +59,7 @@ export class Renderer {
   }
   point(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), v = this.view;
-    return { x: Math.round((clientX - r.left - v.x) / v.size * C.size), y: Math.round((clientY - r.top - v.y) / v.size * C.size) };
+    return { x: Math.round((clientX - r.left - v.x) / v.width * C.size), y: Math.round((clientY - r.top - v.y) / v.height * C.size) };
   }
   buildScene() {
     const w = this.off.width, h = this.off.height, count = w * h;
@@ -94,7 +91,7 @@ export class Renderer {
     this.foreground = surface(this.canvas.width, this.canvas.height);
     const f = this.foreground.getContext('2d'); f.scale(this.dpr, this.dpr);
     const W = this.width, H = this.height, random = mulberry32(1803);
-    // Cropped shoreline, kept outside the playable square. Natural silhouettes
+    // Cropped shoreline at the camera edge. Natural silhouettes
     // continue beyond the camera rather than forming a decorative frame.
     for (let side = 0; side < 2; side++) {
       const cx = side ? W + 23 : -24, cy = side ? H * .19 : H * .78, extent = Math.min(65, W * .11);
@@ -114,31 +111,31 @@ export class Renderer {
   burst(x, y, time) { this.bursts.push({ x, y, time }); }
   water(wave, time) {
     const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h, v = this.view;
-    const sx = this.width / w, sy = this.height / h, inv = C.size / v.size, d = this.details, ref = this.reflection;
+    const sx = this.width / w, sy = this.height / h, invX = C.size / v.width, invY = C.size / v.height, d = this.details, ref = this.reflection;
     const t = this.reduced ? 0 : time, sines = this.sines, phase = t * 117, phase2 = t * 83;
     // Interpolate all four normal samples, not just one axis: the fixed
     // physical grid must not leave stair steps in the rendered highlights.
     const normalX = this.normalX, normalY = this.normalY;
     for (let y = 1; y < 127; y++) for (let x = 1; x < 127; x++) { const p = y * 128 + x; normalX[p] = field[p + 1] - field[p - 1]; normalY[p] = field[p + 128] - field[p - 128]; }
     for (let y = 0; y < h; y++) {
-      const gy = (y * sy - v.y) * inv, iy = Math.floor(gy), fy = gy - iy;
+      const gy = (y * sy - v.y) * invY, iy = Math.floor(gy), fy = gy - iy;
       for (let x = 0; x < w; x++) {
         const i = y * w + x, j = i * 6, p = i * 4, k = i * 3;
-        const gx = (x * sx - v.x) * inv, ix = Math.floor(gx), fx = gx - ix;
+        const gx = (x * sx - v.x) * invX, ix = Math.floor(gx), fx = gx - ix;
         let nx = 0, ny = 0, height = 0;
-        if (ix > 0 && ix < 126 && iy > 0 && iy < 126) {
+        if (ix >= 0 && ix < 127 && iy >= 0 && iy < 127) {
           const c = iy * 128 + ix;
           const a = mix(field[c], field[c + 1], fx), b = mix(field[c + 128], field[c + 129], fx);
           height = mix(a, b, fy);
           nx = mix(mix(normalX[c], normalX[c + 1], fx), mix(normalX[c + 128], normalX[c + 129], fx), fy);
           ny = mix(mix(normalY[c], normalY[c + 1], fx), mix(normalY[c + 128], normalY[c + 129], fx), fy);
-          const edge = clamp(Math.min(gx, gy, 127 - gx, 127 - gy) / 3); nx *= edge; ny *= edge;
+
         }
         const wind1 = sines[(d[j + 4] * 760 + phase + d[j] * 18000) & 2047];
         const wind2 = sines[(d[j + 5] * 410 - phase2 + d[j + 1] * 11000) & 2047];
         const ambient = wind1 * wind2 * .65 + wind1 * .24 + wind2 * .19;
         const normal = nx * .7 + ny * .9;
-        const light = clamp(normal * C.render.normalGain, -25, 35) + ambient * 5.5;
+        const light = clamp(normal * C.render.normalGain, -25, 35) + ambient * 2.5;
         const rx = Math.max(0, Math.min(w - 1, Math.round(x + nx * 70 + wind1 * 1.8)));
         const ry = Math.max(0, Math.min(h - 1, Math.round(y + ny * 70 + wind2 * 1.8)));
         const ri = (ry * w + rx) * 3, bi = (ry * w + rx) * 4;
@@ -161,13 +158,8 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(this.off, 0, 0, W, H);
     ctx.save();
-    if (this.zoom && !this.reduced) { const z = 1 + this.zoom * .014; ctx.translate(v.x + v.size / 2, v.y + v.size / 2); ctx.scale(z, z); ctx.translate(-v.x - v.size / 2, -v.y - v.size / 2); }
-    ctx.translate(v.x, v.y); ctx.scale(scale, scale);
-    // An unobtrusive preview boundary appears only when the pointer leaves the
-    // playable water. It makes the fixed physical domain legible on wide screens.
-    if (hover && !running && (hover.x < 7 || hover.x > 121 || hover.y < 7 || hover.y > 121)) {
-      ctx.strokeStyle = '#d9e1df22'; ctx.lineWidth = .15; ctx.setLineDash([.5, 1.5]); ctx.strokeRect(7, 7, 114, 114); ctx.setLineDash([]);
-    }
+    if (this.zoom && !this.reduced) { const z = 1 + this.zoom * .014; ctx.translate(v.x + v.width / 2, v.y + v.height / 2); ctx.scale(z, z); ctx.translate(-v.x - v.width / 2, -v.y - v.height / 2); }
+    ctx.translate(v.x, v.y); ctx.scale(v.width / C.size, v.height / C.size);
     if (!running && level.clearance) for (const l of level.lanterns) {
       ctx.beginPath(); ctx.arc(l.x, l.y, level.clearance, 0, Math.PI * 2); ctx.strokeStyle = '#dfd9ba38'; ctx.lineWidth = .16; ctx.setLineDash([.6, 1.8]); ctx.stroke(); ctx.setLineDash([]);
     }
@@ -178,19 +170,19 @@ export class Renderer {
       ctx.strokeStyle = '#b9c9cd66'; ctx.lineWidth = .23; ctx.beginPath(); ctx.ellipse(0, 0, r.rx * 1.04, r.ry * 1.03, 0, .2, Math.PI * 1.5); ctx.stroke();
       ctx.drawImage(this.rocks[(i + 2) % this.rocks.length], -r.rx * 1.08, -r.ry * 1.08, r.rx * 2.16, r.ry * 2.16); ctx.restore();
     }
-    for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); if (level.number >= C.delayUnlock) { ctx.save(); ctx.translate(p.x,p.y); ctx.scale(v.size / v.width, v.size / v.height); ctx.fillStyle = '#f1e5c4'; ctx.font = '2.6px Arial'; ctx.textAlign = 'center'; ctx.fillText(`${p.delay || 0}s`,0,-5); ctx.restore(); } }
     if (hover && !running && hover.x >= 7 && hover.x <= 121 && hover.y >= 7 && hover.y <= 121) {
       ctx.strokeStyle = hover.valid ? '#e8e9e187' : '#e4bdac77'; ctx.lineWidth = .17; ctx.beginPath(); ctx.ellipse(hover.x, hover.y, 3, 3, 0, 0, Math.PI * 2); ctx.stroke();
     }
     stones.forEach((stone, i) => {
       const age = (wave.stepNumber - (stone.delay || 0) * C.delaySteps) / C.delaySteps, sinking = running && age >= 0;
       const radius = Math.max(C.render.placedStoneRadius, C.render.stoneMinPixels / (2 * scale));
-      ctx.save(); ctx.translate(stone.x, stone.y);
+      ctx.save(); ctx.translate(stone.x, stone.y); ctx.scale(v.size / v.width, v.size / v.height);
       if (sinking) ctx.globalAlpha = clamp(1 - age * 3.5, 0, 1);
       ctx.fillStyle = '#12232c77'; ctx.beginPath(); ctx.ellipse(.5, .8, radius * .9, radius * .65, -.3, 0, Math.PI * 2); ctx.fill();
       ctx.rotate(-.4 + i * 1.2); ctx.drawImage(this.rocks[(i + 5) % this.rocks.length], -radius, -radius, radius * 2, radius * 2); ctx.restore();
       if (sinking && age < .38 && !this.reduced) {
-        ctx.save(); ctx.translate(stone.x, stone.y); ctx.strokeStyle = `rgba(225,237,238,${(1 - age / .38) * .6})`; ctx.lineWidth = .18;
+        ctx.save(); ctx.translate(stone.x, stone.y); ctx.scale(v.size / v.width, v.size / v.height); ctx.strokeStyle = `rgba(225,237,238,${(1 - age / .38) * .6})`; ctx.lineWidth = .18;
         ctx.beginPath(); ctx.arc(0, 0, .6 + age * 9, 0, Math.PI * 2); ctx.stroke();
         for (let k = 0; k < 9; k++) { const a = k * 2.3999, r = age * 12; ctx.fillStyle = `rgba(218,232,235,${clamp(1 - age / .32) * .7})`; ctx.beginPath(); ctx.ellipse(Math.cos(a) * r, Math.sin(a) * r - Math.sin(age / .38 * Math.PI) * 2, .12, .23, a, 0, Math.PI * 2); ctx.fill(); } ctx.restore();
       }
@@ -207,7 +199,7 @@ export class Renderer {
   lantern(ctx, l, on, time, i, wave) {
     const bob = this.reduced ? 0 : Math.sin(time * 1.2 + i * 1.7) * .13;
     ctx.save(); ctx.translate(l.x, l.y + bob);
-    const objectScale = Math.max(1, C.render.lanternMinPixels / (5 * this.view.size / C.size)); ctx.scale(objectScale, objectScale);
+    const objectScale = Math.max(1, C.render.lanternMinPixels / (5 * this.view.size / C.size)); ctx.scale(objectScale * this.view.size / this.view.width, objectScale * this.view.size / this.view.height);
     if (on) {
       const g = ctx.createRadialGradient(0, 0, .4, 0, 0, 12); g.addColorStop(0, '#edb65c57'); g.addColorStop(.25, '#d7aa5520'); g.addColorStop(1, '#dfb66700'); ctx.fillStyle = g; ctx.fillRect(-12, -12, 24, 24);
       // Broken amber reflections follow the surface, rather than a neon halo.
