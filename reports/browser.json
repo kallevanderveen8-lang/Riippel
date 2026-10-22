@@ -1,6 +1,6 @@
 {
   "passed": true,
-  "firstContentfulPaintMs": 164,
+  "firstContentfulPaintMs": 404,
   "checks": [
     "initial interactive pond, SDK blocked",
     "pointer placement and mid-level restore",
@@ -10,11 +10,10 @@
     "frame loop survives asynchronous procedural level loading",
     "delayed stone tap",
     "pause and resume",
+    "collection drawer opens and resumes play",
     "daily pond, streak, clipboard share",
     "320px / 390px portrait and 844px landscape layout",
     "60 / 144 Hz identical peak hash"
   ],
-  "errors": [],
-  "testedCommit": "2408ce90212706251975642b781d01c31e5e8b2f",
-  "workflowRun": "https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39632741119"
+  "errors": []
 }

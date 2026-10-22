@@ -129,9 +129,9 @@ npm run test:browser
 
 GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, failed attempts, delays, pause/resume, daily sharing, 320/390 px portrait layouts, 844 px landscape, and 60/144 Hz peak equality.
 
-**Previous visual release QA:** 14 unit tests and all 11 browser check groups; zero browser errors. First contentful paint was **164 ms** in headless Chromium on GitHub Actions (not a universal network/device load guarantee). The blocked-SDK route was explicitly exercised. See [the successful run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39632741119) and `reports/browser.json`.
+**Natural-lake visual release QA passed:** 14 unit tests and all 12 browser check groups; zero browser errors. The full-screen lake, textured stones, new audio and Collection drawer were tested on desktop, 320/390 px portrait and 844 px landscape layouts. Pointer-to-simulation mapping, all ten authored solutions, save restore, pause/resume and daily sharing passed. The last renderer revision removes grid stair steps from wave lighting. See [the passing run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39744359610) and `reports/browser.json`.
 
-The previous desktop, portrait and landscape screenshots in `docs/` are archived references and do not depict the new visual design. Current screenshots are produced by the latest Actions run. Short-viewport spacing was corrected so the pond and instructions stay above the footer. Viewport tests do not substitute for real iPhone/Android performance or Safari testing. Live monetization requires the CrazyGames preview/production environment.
+The current [desktop](docs/desktop.webp), [portrait](docs/mobile.webp) and [landscape](docs/landscape.webp) screenshots were inspected. First paint is a headless browser measurement, not a universal device/network guarantee. Live monetization still requires the CrazyGames preview/production environment.
 
 ## SDK and advertisement behavior
 
