@@ -208,6 +208,8 @@ try {
   const layoutBefore=await page.evaluate(()=>JSON.stringify({level:window.__ripple.state.level,stones:window.__ripple.state.stones}));
   await page.evaluate(()=>{window.__ripple.state.progress.tokens=40;window.__ripple.refresh();});
   await openJournal();await page.click('#tab-shop');
+  assert.equal(await page.locator('[data-item="quartz"] button').isDisabled(),true);
+  assert.match(await page.locator('[data-item="quartz"] button').innerText(),/Level 21/);
   await page.click('[data-item="frog"] button');
   assert.equal(await page.evaluate(()=>window.__ripple.state.progress.cosmetics.stone),'frog');
   assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),25);

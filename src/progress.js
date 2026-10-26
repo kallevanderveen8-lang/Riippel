@@ -55,9 +55,14 @@ export function masteryTarget(p, number) {
 export function discoveries(p) {
   const campaign = Object.entries(p.stars).filter(([key,value]) => /^l\d+$/.test(key) && value > 0);
   const trails = Object.values(p.dailyResults).filter(r => r?.trail).length;
+  const quickVisits = Object.values(p.dailyResults).filter(r => r?.quick || r?.trail).length;
   const perfect = campaign.filter(([,value]) => value === 3).length;
   const gifts = p.dailyGift?.total || 0, stars = totalStars(p);
   return [
+    ...Array.from({length:12},(_,group)=>({ id:`postcard-${group}`, name:`${lakeForLevel(group*C.lakeLength+1).name} postcard`, detail:`Complete levels ${group*C.lakeLength+1}–${(group+1)*C.lakeLength}`, value:campaign.filter(([key])=>{const n=Number(key.slice(1));return n>group*C.lakeLength&&n<=(group+1)*C.lakeLength;}).length, target:C.lakeLength, reward:2, postcard:group })),
+    { id:'three-daily-visits', name:'By the water', detail:'Finish a daily puzzle on 3 days', value:quickVisits, target:3, reward:2 },
+    { id:'seven-daily-visits', name:'A daily pause', detail:'Finish a daily puzzle on 7 days', value:quickVisits, target:7, reward:3 },
+    { id:'fourteen-daily-visits', name:'A familiar ripple', detail:'Finish a daily puzzle on 14 days', value:quickVisits, target:14, reward:4 },
     { id:'first-chapter', name:'First light', detail:'Complete 5 journey lakes', value:campaign.length, target:5, reward:2 },
     { id:'ten-lakes', name:'Echo explorer', detail:'Complete 10 journey lakes', value:campaign.length, target:10, reward:2 },
     { id:'ten-perfect', name:'A careful hand', detail:'Earn 3 stars on 10 journey lakes', value:perfect, target:10, reward:3 },
@@ -110,7 +115,7 @@ export function claimDailyGift(p, day = daySeed()) {
 export function buyCosmetic(p,kind,id) {
   const catalog=C.cosmetics[kind];
   const item=catalog?.find(entry=>entry.id===id);
-  if (!item || p.cosmetics[kind].includes(id) || !spend(p,item.cost)) return false;
+  if (!item || p.level < (item.unlockLevel || 1) || p.cosmetics[kind].includes(id) || !spend(p,item.cost)) return false;
   p.cosmetics[kind].push(id);
   p.cosmetics[kind==='stones'?'stone':'lantern']=id;
   return true;
@@ -130,7 +135,8 @@ export function complete(p, key, stones, par, resetUsed, stats = {}) {
   const before = totalStars(p), first = !p.stars[key], old = p.records[key]; p.stars[key] = Math.max(p.stars[key] || 0, stars);
   const newRecord = !old || stones < old.stones || (stones === old.stones && stats.attempts < old.attempts);
   if (newRecord) p.records[key] = { stones, attempts: stats.attempts || 1, seconds: Math.round(stats.elapsed || 0) };
-  if (first) p.tokens = Math.min(C.maxTokens, p.tokens + 1);
+  // Journey clears fund the shop; the daily puzzle has its own once-per-day coin.
+  if (first && key.startsWith('l')) p.tokens = Math.min(C.maxTokens, p.tokens + 1);
   if (!p.goals.solves.includes(key)) p.goals.solves.push(key);
   if (stars === 3) p.goals.three = true; if (!resetUsed) p.goals.clean = true;
   let goalBonus = 0;
@@ -161,6 +167,10 @@ export function finishDaily(p, day, stage, result, stones) {
   const run = dailyRun(p, day);
   if (!run.results[stage] || result.stars > run.results[stage].stars) run.results[stage] = { stars: result.stars, stones };
   run.stage = Math.max(run.stage, Math.min(C.dailyLength - 1, stage + 1));
+  if (stage === 0 && !p.dailyResults[day]?.quick && !p.dailyResults[day]?.trail) {
+    p.dailyResults[day] = { ...p.dailyResults[day], quick:true };
+    p.tokens = Math.min(C.maxTokens,p.tokens+1);
+  }
   if (run.results.filter(Boolean).length !== C.dailyLength) return null;
   const record = { stars: run.results.reduce((n,r) => n + r.stars, 0), stones: run.results.reduce((n,r) => n + r.stones, 0) };
   if (!p.dailyResults[day]?.trail) {
@@ -168,7 +178,7 @@ export function finishDaily(p, day, stage, result, stones) {
     if (p.lastDaily !== day) { p.streak = p.lastDaily === day - 1 ? p.streak + 1 : 1; p.lastDaily = day; }
     p.tokens = Math.min(C.maxTokens, p.tokens + C.dailyTokens);
   }
-  p.dailyResults[day] = { ...record, trail: true };
+  p.dailyResults[day] = { ...record, quick:true, trail: true };
   result.discoveries = [...new Map([...(result.discoveries || []),...readyDiscoveries(p)].map(d=>[d.id,d])).values()];
   return record;
 }

@@ -14,7 +14,17 @@ export function levelName(number) {
   const group=Math.floor((number-1)/C.lakeLength),slot=(number-1)%C.lakeLength;
   return lakeNames[group%lakeNames.length][slot];
 }
-export function difficulty(number) {
+export function difficulty(number, legacy = false) {
+  if (!legacy && number > 10) {
+    // Each shore introduces a different rhythm; the last puzzle is a finale.
+    const slot = (number - 1) % C.lakeLength;
+    const opening = [3,3,4,3,4,4,3,4,4,5];
+    const later = [3,4,3,4,5,3,4,5,4,5];
+    const par = (number <= 30 ? opening : later)[slot];
+    return { par, count: Math.min(6,par+(slot===6 || slot===8 ? 1 : 0)),
+      rocks: slot===0 || slot===5 ? 0 : slot===1 || slot===2 || slot===6 ? 1 : 2,
+      delays: number >= C.delayUnlock && (slot===4 || slot===9) };
+  }
   return { par: number < 3 ? 1 : number < 5 ? 2 : number < 10 ? 3 : number < 20 ? 4 : 5,
     count: number === 1 || number === 3 ? 1 : number < 5 ? 2 : number < 10 ? 3 : number < 20 ? 4 : number < 30 ? 5 : 6,
     rocks: number < 7 ? 0 : number < 12 ? 1 : 2, delays: number >= C.delayUnlock };
@@ -52,8 +62,8 @@ export function candidatesFor(wave, solution, rocks, count, rng) {
   }
   return { lanterns, margins: lanterns.map(l => ({ all: all[cell(l.x, l.y)], single: single[cell(l.x, l.y)] })) };
 }
-export function generate(number, seed = number * 7919, daily = false) {
-  const start = performance.now(), rng = mulberry32(seed), d = difficulty(number);
+export function generate(number, seed = number * 7919, daily = false, legacy = false) {
+  const start = performance.now(), rng = mulberry32(seed), d = difficulty(number, legacy);
   if (number <= 2) return { number, seed, name: names[number - 1], par: 1, limit: 3, rocks: [], solution: [{ x: 64, y: 64, delay: 0 }], lanterns: number === 1 ? [{ x: 64, y: 49 }] : [{ x: 51, y: 64 }, { x: 77, y: 64 }], clearance: 0, generationMs: performance.now() - start };
   if (number === 3 || number === 4) {
     const solution = [{ x: 36, y: 64, delay: 0 }, { x: 92, y: 64, delay: 0 }];
@@ -77,13 +87,13 @@ export function generate(number, seed = number * 7919, daily = false) {
       if (solution.every(p => distance2(p, s) > C.stoneSpacing ** 2)) solution.push(s);
     }
     // Delays are optional initially; every fifth late pond uses a real delayed drop.
-    if (d.delays && number % 5 === 0) solution[solution.length - 1].delay = 1;
+    if (d.delays && (legacy ? number % 5 === 0 : true)) solution[solution.length - 1].delay = 1;
     const result = candidatesFor(wave, solution, rocks, d.count, rng);
     if (result.lanterns.length === d.count) return { number, seed, name: daily ? 'One pond. Everyone.' : levelName(number), par: d.par, limit: d.par + 2, rocks, solution, ...result, clearance: C.lanternClearance, generationMs: performance.now() - start, retries: attempt };
   }
   // Never ship an unverified or softened-margin fallback. The next deterministic
   // seed keeps searching with the same difficulty and original daily identity.
-  const fallback = generate(number, (seed + 104729) >>> 0, daily);
+  const fallback = generate(number, (seed + 104729) >>> 0, daily, legacy);
   return { ...fallback, seed, generationMs: performance.now() - start, fallback: true };
 }
 export function canPlace(p, level, stones = [], ignore = -1) {

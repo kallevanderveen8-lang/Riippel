@@ -10,7 +10,7 @@ test('coins can unlock only the next lake, once, after the first solve',()=>{
  assert.equal(buyNextLake(saved,4),false);
 });
 test('star improvement and goals cannot be farmed by replay',()=>{const p=freshProgress();let r=complete(p,'l1',1,1,false);assert.equal(r.stars,3);assert.equal(totalStars(p),7);complete(p,'l1',1,1,false);assert.equal(totalStars(p),7);complete(p,'l2',4,2,true);assert.equal(p.stars.l2,1);complete(p,'l2',2,2,true);assert.equal(p.stars.l2,3);assert.equal(totalStars(p),10);});
-test('daily streak requires all three lakes, survives resume, pays once, resets after gap',()=>{const p=freshProgress();function run(day){for(let i=0;i<3;i++)finishDaily(p,day,i,{stars:3},4);}finishDaily(p,10,0,{stars:3},4);assert.equal(p.streak,0);assert.equal(dailyRun(parseProgress(JSON.stringify(p)),10).stage,1);run(10);assert.equal(p.streak,1);const tokens=p.tokens;run(10);assert.equal(p.tokens,tokens);run(11);assert.equal(p.streak,2);run(13);assert.equal(p.streak,1);assert.deepEqual(p.dailyResults[13],{stars:9,stones:12,trail:true});});
+test('daily streak requires all three lakes, survives resume, pays once, resets after gap',()=>{const p=freshProgress();function run(day){for(let i=0;i<3;i++)finishDaily(p,day,i,{stars:3},4);}finishDaily(p,10,0,{stars:3},4);assert.equal(p.streak,0);assert.equal(p.dailyResults[10].quick,true);assert.equal(dailyRun(parseProgress(JSON.stringify(p)),10).stage,1);run(10);assert.equal(p.streak,1);const tokens=p.tokens;run(10);assert.equal(p.tokens,tokens);run(11);assert.equal(p.streak,2);run(13);assert.equal(p.streak,1);assert.deepEqual(p.dailyResults[13],{stars:9,stones:12,quick:true,trail:true});});
 test('chapters reward new completions once and milestones wait to be claimed',()=>{const p=freshProgress();for(let n=1;n<=5;n++)complete(p,`l${n}`,2,2,false,{attempts:4});assert.equal(p.tokens,C.initialTokens+5+C.chapterTokens+C.masteryTokens);assert.equal(readyDiscoveries(p).some(d=>d.id==='first-chapter'),true);assert.equal(p.chapters[0],true);const bonus=p.bonus;const r=complete(p,'l5',1,2,false,{attempts:2});assert.equal(r.newRecord,true);assert.equal(p.records.l5.stones,1);assert.equal(p.bonus,bonus);assert.equal(spend(p,1),true);p.tokens=0;assert.equal(spend(p,1),false);assert.equal(p.tokens,0);});
 test('old and corrupt saves recover, UTC rollover resets goals only',()=>{assert.equal(parseProgress('no json').level,1);const p=freshProgress();p.level=8;p.stars.l1=3;rollDay(p,p.goals.day+1);assert.equal(p.level,8);assert.equal(totalStars(p),3);assert.equal(goals(p)[0].value,0);const old=parseProgress('{"version":1,"level":-3}');assert.equal(old.level,1);assert.equal(old.tokens,C.initialTokens);});
 test('first-run guidance and menu preferences survive saves without interrupting existing players',()=>{
@@ -31,7 +31,7 @@ test('chapter mastery rewards improving old lakes and cannot be farmed after rel
 });
 test('milestones count distinct days without requiring a streak',()=>{
  let p=freshProgress();for(const day of [10,13,20])for(let stage=0;stage<3;stage++)finishDaily(p,day,stage,{stars:3},3);
- assert.equal(p.streak,1);assert.equal(p.discoveries['three-trails'],undefined);assert.equal(readyDiscoveries(p).some(d=>d.id==='three-trails'),true);assert.equal(p.tokens,C.initialTokens+3*C.dailyTokens);
+ assert.equal(p.streak,1);assert.equal(p.discoveries['three-trails'],undefined);assert.equal(readyDiscoveries(p).some(d=>d.id==='three-trails'),true);assert.equal(p.tokens,C.initialTokens+3*(C.dailyTokens+1));
  p=parseProgress(JSON.stringify(p));const before=p.tokens;for(let stage=0;stage<3;stage++)finishDaily(p,20,stage,{stars:3},3);
  assert.equal(p.tokens,before);assert.equal(discoveries(p).find(d=>d.id==='three-trails').value,3);
 });
@@ -71,6 +71,27 @@ test('daily visit rewards grow, reset after missed day, and claim once',()=>{
  const p=freshProgress();const first=claimDailyGift(p,100);assert.deepEqual(first,{streak:1,reward:2});assert.equal(claimDailyGift(p,100),null);
  assert.equal(claimDailyGift(p,101).reward,3);assert.equal(claimDailyGift(p,103).streak,1);
  const saved=parseProgress(JSON.stringify(p));assert.equal(saved.dailyGift.total,3);assert.equal(claimDailyGift(saved,103),null);
+});
+test('one daily puzzle pays once before the optional trail and unlocks its milestone',()=>{
+ const p=freshProgress(),start=p.tokens;
+ complete(p,'d200-0',4,3,false);assert.equal(p.tokens,start);
+ finishDaily(p,200,0,{stars:2},4);
+ assert.equal(p.tokens,start+1);assert.equal(p.dailyResults[200].quick,true);assert.equal(p.streak,0);
+ finishDaily(p,200,0,{stars:3},3);assert.equal(p.tokens,start+1);
+ finishDaily(p,200,1,{stars:3},3);finishDaily(p,200,2,{stars:3},3);
+ assert.equal(p.tokens,start+3);assert.equal(p.streak,1);
+ for(const day of [201,202])finishDaily(p,day,0,{stars:3},3);
+ assert.equal(discoveries(p).find(d=>d.id==='three-daily-visits').ready,true);
+ assert.equal(p.tokens,start+5);
+});
+test('future cosmetics stay locked while earned postcards remain claimable',()=>{
+ const p=freshProgress();p.tokens=100;
+ assert.equal(buyCosmetic(p,'stones','quartz'),false);assert.equal(p.tokens,100);
+ p.level=21;assert.equal(buyCosmetic(p,'stones','quartz'),true);assert.equal(p.tokens,86);
+ for(let n=1;n<=10;n++)p.stars[`l${n}`]=2;
+ assert.equal(discoveries(p).find(d=>d.id==='postcard-0').ready,true);
+ assert.equal(claimDiscovery(p,'postcard-0').reward,2);
+ assert.equal(claimDiscovery(p,'postcard-0'),null);
 });
 test('mastery suggests a completed lake closest to three stars and never opens locked lakes',()=>{
  const p=freshProgress();p.level=4;p.stars={l1:1,l2:2,l3:3,l5:2,'d200-0':2};

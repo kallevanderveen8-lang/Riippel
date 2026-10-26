@@ -100,6 +100,9 @@ footer{position:absolute;bottom:calc(var(--edge) + var(--safe-bottom));left:max(
 #reward-stars{display:flex;justify-content:center;align-items:center;gap:12px;margin:22px 0 18px;color:var(--line)}
 #reward-stars .icon{width:32px;height:32px;stroke-width:1.3}
 #reward-stars .earned{fill:var(--gold);stroke:var(--gold);filter:drop-shadow(0 2px 8px #d6be8b20)}
+#overlay.lake-finale .overlay-inner{border-color:#dacb98;box-shadow:0 24px 80px #061c1360,0 0 0 5px #e6d4a319;animation:lake-finale 850ms ease-out both}
+@keyframes lake-finale{0%{box-shadow:0 24px 80px #061c1360,0 0 0 0 #e6d4a36b}65%{box-shadow:0 24px 80px #061c1360,0 0 0 10px #e6d4a31c}100%{box-shadow:0 24px 80px #061c1360,0 0 0 5px #e6d4a319}}
+#overlay.lake-finale #reward-stars .earned{filter:drop-shadow(0 0 12px #f4d58c88)}
 #overlay.is-paused #reward-stars{display:none}
 #overlay.is-paused .overlay-inner{width:400px;padding:36px}
 #overlay.is-paused .result-secondary{grid-template-columns:1fr;margin-top:12px}
@@ -112,6 +115,7 @@ footer{position:absolute;bottom:calc(var(--edge) + var(--safe-bottom));left:max(
 .reward-choice:hover:not(:disabled){background:var(--inset)}
 .result-secondary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .result-secondary .reward-choice{margin:0}
+#daily-continue{grid-column:1/-1;grid-row:1;border-color:#d9c993;color:#f3e6c5}
 #bonus-options{margin-top:18px;border-top:1px solid var(--line);padding-top:4px;text-align:left}
 #bonus-options summary{display:flex;align-items:center;justify-content:space-between;list-style:none;cursor:pointer;min-height:44px;font-size:.75rem;color:var(--muted)}
 #bonus-options summary::-webkit-details-marker{display:none}
@@ -341,6 +345,7 @@ dialog::backdrop{background:#041b23b8;backdrop-filter:blur(9px)}
 .discovery span,.discovery small{font-size:.8125rem;color:#cedccf}
 .discovery.earned{border-color:#d8c388}.discovery.earned strong,.discovery.earned>.icon{color:#e6ce9d}
 .discovery progress{height:5px}.discovery progress::-webkit-progress-bar{background:#8eada259}.discovery progress::-webkit-progress-value{background:#e0c58d}
+.postcard-art{width:100%;height:104px;object-fit:cover;border-radius:7px;border:1px solid #b5cfbc77;margin-bottom:5px}
 
 /* Pause, guide and settings use the same translucent mineral surface. */
 .overlay-inner{border-radius:17px;background-image:linear-gradient(145deg,#173d40f5,#0c292ef7),var(--menu-scene);background-size:cover;background-position:center;padding:34px 38px 27px}
@@ -525,6 +530,8 @@ header{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center
 .shop-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
 .shop-card{display:grid;grid-template-columns:58px minmax(0,1fr);grid-template-rows:1fr auto;align-items:center;gap:9px 11px;padding:11px;border:1px solid #98b7ac66;border-radius:10px;background:#123438a6;min-width:0}
 .shop-card.equipped{border-color:#e3cf9a;background:#2e4b42a8}
+.shop-card.locked{background:#102e31a6}
+.shop-card.locked img{filter:saturate(.45);opacity:.72}
 .shop-card img{width:58px;height:58px;object-fit:contain;grid-row:1}
 .shop-card strong{display:block;font-size:.8125rem;color:#f2eee1}
 .shop-card small{font-size:.6875rem;color:#b9cdbf}

@@ -2,7 +2,7 @@
 export const C = Object.freeze({
   version: 1, launchStage: 'basic',
   chapters: ['First light', 'Stone & echo', 'A moment in time', 'Across the water', 'Quiet currents', 'Far shores'], size: 128, c2: 0.22, damp: 0.996, radius: 4, amplitude: 1,
-  threshold: 0.065, steps: 360, tickHz: 60, stepsPerTick: 2,
+  threshold: 0.065, steps: 360, tickHz: 60, stepsPerTick: 2, retryStepsPerTick: 4,
   delaySteps: 120, maxDelay: 2, maxFrameDelta: 0.1,
   marginAll: 1.15, marginSingle: 0.7, wallMargin: 10, stoneMargin: 10,
   lanternSpacing: 10, stoneSpacing: 13, placementMargin: 7,
@@ -19,13 +19,23 @@ export const C = Object.freeze({
       { id:'amber', name:'Amber stone', cost:8, kind:'Natural' },
       { id:'sleepy', name:'Sleepy pebble', cost:12, kind:'Playful' },
       { id:'frog', name:'Frog stone', cost:15, kind:'Playful' },
-      { id:'potato', name:'Tiny potato', cost:18, kind:'Playful' }
+      { id:'potato', name:'Tiny potato', cost:18, kind:'Playful' },
+      { id:'moss', name:'Moss stone', cost:10, kind:'Natural', unlockLevel:11 },
+      { id:'quartz', name:'Blue quartz', cost:14, kind:'Natural', unlockLevel:21 },
+      { id:'opal', name:'Opal stone', cost:20, kind:'Natural', unlockLevel:31 },
+      { id:'duck', name:'Duck pebble', cost:25, kind:'Playful', unlockLevel:41 },
+      { id:'bread', name:'Little loaf', cost:35, kind:'Playful', unlockLevel:61 },
+      { id:'cosmic', name:'Cosmic stone', cost:45, kind:'Playful', unlockLevel:91 }
     ],
     lanterns: [
       { id:'bronze', name:'Bronze lantern', cost:0, kind:'Classic' },
       { id:'reed', name:'Reed lantern', cost:6, kind:'Natural' },
       { id:'silver', name:'Silver lantern', cost:9, kind:'Cool' },
-      { id:'firefly', name:'Firefly lantern', cost:14, kind:'Warm' }
+      { id:'firefly', name:'Firefly lantern', cost:14, kind:'Warm' },
+      { id:'copper', name:'Copper lantern', cost:12, kind:'Warm', unlockLevel:21 },
+      { id:'lotus', name:'Lotus lantern', cost:18, kind:'Natural', unlockLevel:31 },
+      { id:'star', name:'Starlight lantern', cost:25, kind:'Cool', unlockLevel:51 },
+      { id:'moon', name:'Moonstone lantern', cost:32, kind:'Cool', unlockLevel:81 }
     ]
   },
   themes: [

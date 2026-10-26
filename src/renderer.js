@@ -160,8 +160,8 @@ export class Renderer {
     const key=`${this.theme.name}:${index}:${id}:${artVersion}`;
     if(this.cosmeticCache.has(key))return this.cosmeticCache.get(key);
     const c=surface(512),ctx=c.getContext('2d');ctx.drawImage(base,0,0);
-    const tints={slate:'#53677b',amber:'#c99650',sleepy:'#9d9bba',frog:'#6d9b5a',potato:'#b69a6a'};
-    ctx.globalCompositeOperation='source-atop';ctx.fillStyle=tints[id]+'7a';ctx.fillRect(0,0,512,512);ctx.globalCompositeOperation='source-over';
+    const tints={slate:'#53677b',amber:'#c99650',sleepy:'#9d9bba',frog:'#6d9b5a',potato:'#b69a6a',moss:'#5d8664',quartz:'#6c9db1',opal:'#a8b7bb',duck:'#c9a953',bread:'#bc936c',cosmic:'#404c81'};
+    ctx.globalCompositeOperation='source-atop';ctx.fillStyle=(tints[id]||'#939d91')+'7a';ctx.fillRect(0,0,512,512);ctx.globalCompositeOperation='source-over';
     if(['sleepy','frog','potato'].includes(id)) {
       ctx.lineCap='round';ctx.lineWidth=13;ctx.strokeStyle='#243734';ctx.fillStyle='#243734';
       if(id==='sleepy') {
@@ -173,6 +173,11 @@ export class Renderer {
         if(id==='frog'){ctx.fillStyle='#e3d6ad';for(const x of [191,319]){ctx.beginPath();ctx.arc(x,246,4,0,Math.PI*2);ctx.fill();}}
       }
     }
+    if(id==='moss'){ctx.globalAlpha=.65;ctx.fillStyle='#456d48';for(let n=0;n<22;n++){const x=130+(n*73)%260,y=140+(n*97)%210;ctx.beginPath();ctx.ellipse(x,y,8+(n%4)*4,5+(n%3)*3,n*.7,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
+    if(id==='quartz'||id==='opal'){ctx.strokeStyle=id==='quartz'?'#c5e5e9b0':'#f5e6d7b0';ctx.lineWidth=7;for(const [x,y] of [[185,155],[315,170],[250,305]]){ctx.beginPath();ctx.moveTo(x-20,y+25);ctx.lineTo(x,y-24);ctx.lineTo(x+23,y+16);ctx.stroke();}}
+    if(id==='duck'){ctx.fillStyle='#253c3a';for(const x of [204,304]){ctx.beginPath();ctx.arc(x,237,9,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#d58645';ctx.beginPath();ctx.ellipse(254,280,34,14,0,0,Math.PI*2);ctx.fill();}
+    if(id==='bread'){ctx.strokeStyle='#ead3a4';ctx.lineWidth=12;ctx.lineCap='round';for(const x of [192,250,308]){ctx.beginPath();ctx.moveTo(x-16,230);ctx.lineTo(x+6,278);ctx.stroke();}}
+    if(id==='cosmic'){ctx.fillStyle='#e3dbba';for(const [x,y,r] of [[192,215,7],[310,190,5],[270,305,9],[355,270,4]]){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}}
     this.cosmeticCache.set(key,c);return c;
   }
   cosmeticPreview(kind,id) {
@@ -448,7 +453,7 @@ export class Renderer {
       for (let r = 0; r < 12; r++) { const dy = 2.5 + r * .55, wobble = Math.sin(time * 1.8 + r * 1.3) * .6; ctx.strokeStyle = `rgba(235,192,117,${(.22 - r * .016)})`; ctx.lineWidth = .27; ctx.beginPath(); ctx.moveTo(-1.3 + wobble, dy); ctx.lineTo(1.3 + wobble, dy); ctx.stroke(); }
     }
     ctx.fillStyle = '#14222c88'; ctx.beginPath(); ctx.ellipse(.3, .65, 2.75, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-    const finish={bronze:['#b39b70','#685845','#3e3830'],reed:['#a3a575','#58674b','#303f34'],silver:['#d8e0db','#839399','#485c69'],firefly:['#cbb879','#806f46','#3b4032']}[this.cosmetics.lantern]||['#b39b70','#685845','#3e3830'];
+    const finish={bronze:['#b39b70','#685845','#3e3830'],reed:['#a3a575','#58674b','#303f34'],silver:['#d8e0db','#839399','#485c69'],firefly:['#cbb879','#806f46','#3b4032'],copper:['#d7a875','#9b6245','#604039'],lotus:['#d5d5b2','#819b77','#425f5b'],star:['#e4e5d2','#8d9faf','#526379'],moon:['#ded5ca','#8795aa','#4d5973']}[this.cosmetics.lantern]||['#b39b70','#685845','#3e3830'];
     const wood = ctx.createLinearGradient(-2, -2, 2, 2); wood.addColorStop(0, finish[0]); wood.addColorStop(.45,finish[1]); wood.addColorStop(1,finish[2]);
     ctx.fillStyle = wood; ctx.beginPath(); ctx.ellipse(0, 0, 2.5, 2.35, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#c1aa7d77'; ctx.lineWidth = .13; ctx.beginPath(); ctx.ellipse(0, -.1, 2.17, 1.99, 0, 0, Math.PI * 2); ctx.stroke();
@@ -457,8 +462,10 @@ export class Renderer {
     ctx.fillStyle = glass; ctx.beginPath(); ctx.arc(0, -.15, 1.67, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#574d3c'; ctx.lineWidth = .17; ctx.beginPath(); ctx.moveTo(-1.1, -1.4); ctx.lineTo(-.7, 1.2); ctx.moveTo(1, -1.4); ctx.lineTo(.7, 1.2); ctx.stroke();
     ctx.fillStyle = on ? '#fff3c3' : '#66685c'; ctx.beginPath(); ctx.ellipse(0, -.15, .28, .45, .15, 0, Math.PI * 2); ctx.fill();
+    if(this.cosmetics.lantern==='lotus'){ctx.strokeStyle='#dbe6c2';ctx.lineWidth=.16;for(const angle of [-.55,0,.55]){ctx.beginPath();ctx.ellipse(Math.sin(angle)*1.8,1.65, .38,.7,angle,0,Math.PI*2);ctx.stroke();}}
+    if(this.cosmetics.lantern==='star'||this.cosmetics.lantern==='moon'){ctx.strokeStyle='#f5e8c7';ctx.lineWidth=.19;ctx.beginPath();if(this.cosmetics.lantern==='star'){ctx.moveTo(0,-1.13);ctx.lineTo(0,.8);ctx.moveTo(-.85,-.15);ctx.lineTo(.85,-.15);}else{ctx.arc(.04,-.1,.69,.45,4.9);}ctx.stroke();}
     ctx.strokeStyle = '#f4f0d49c'; ctx.lineWidth = .14; ctx.beginPath(); ctx.arc(-.1, -.3, 1.23, 3.5, 4.8); ctx.stroke();
-    if (!on && wave.stepNumber >= C.steps) { const ratio = Math.min(1, wave.peak[Math.round(l.y) * C.size + Math.round(l.x)] / C.threshold); ctx.strokeStyle = '#dac49b99'; ctx.lineWidth = .22; ctx.beginPath(); ctx.arc(0, 0, 3.5, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2); ctx.stroke(); }
+    if (!on && wave.stepNumber >= C.steps) { const ratio = Math.min(1, wave.peak[Math.round(l.y) * C.size + Math.round(l.x)] / C.threshold); ctx.strokeStyle = this.failure===i?'#f6e2a6':'#dac49b99'; ctx.lineWidth = this.failure === i ? .35 : .22; ctx.beginPath(); ctx.arc(0, 0, this.failure===i?4.25:3.5, -Math.PI / 2, -Math.PI / 2 + ratio * Math.PI * 2); ctx.stroke(); }
     ctx.restore();
   }
 }

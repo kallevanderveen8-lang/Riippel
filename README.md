@@ -6,6 +6,8 @@ The visual direction follows the supplied minimalist lake reference: natural tea
 
 The six landscapes are Morning lake (woodland), Evening light (reed shallows), After the rain (rainforest pool), Moonlit water (rocky cove), Autumn glow (amber woodland), and Alpine dawn (mountain basin). Each has its own photographic-style lake plate and matching small journal preview. Levels 1–10 stay at Morning lake, 11–20 at Evening light, and so on; after level 60, the six environments return in new ten-level runs. Day and night can be selected separately for each unlocked lake. The water and stones are separate: the wave simulation, stone placement and level collision remain interactive. Image loading falls back to the original procedural scene if a local asset fails. The lake plates are packaged at 3840×2160 pixels; their generated source images were 1672×941 and were upscaled for export, so they do not contain native 4K source detail. At large display sizes, the static lake plate retains its full resolution while the animated canvas is capped at 2048×1152 for smoother play.
 
+The first 30 campaign puzzles have fixed, verified layouts. Later shores alternate shorter openings, denser middle puzzles and five-stone finales; every generated solution is checked against the wave model. A failed drop marks the closest unlit lantern and gives a short adjustment cue, while later retries run faster. The daily puzzle now pays one coin after the first puzzle; two more optional puzzles complete the shareable trail. Collection has lake postcards, additional claimable milestones and cosmetics that unlock gradually. In-progress puzzles from older saves retain their original generation profile.
+
 ## Play and upload
 
 Requirements: Node.js 20+ for the development tools. The game itself runs in a browser.
@@ -46,7 +48,7 @@ Keyboard: Tab to the lake, use arrow keys to aim (Shift moves four cells), Enter
 
 Menus use a consistent dark teal lake palette, scenic imagery, editorial journal sections and clear focus states. Text scales with browser text settings. The UI respects reduced motion, reduced transparency and increased contrast where the browser exposes those preferences, with in-game motion and contrast overrides in Settings. Timing labels retain their proportions when the game frame changes. See the [CrazyGames menu research](docs/crazygames-menu-research.md) for the observed competitors and resulting choices, the [minimal UI redesign review](docs/minimal-ui-redesign.md) for palette and layout, and the [desktop design and retention review](docs/desktop-design-and-retention.md) for progression and research limitations.
 
-Ponds 1–10 are fixed and verified. Pond 3 introduces interference; two failed attempts on ponds 3–5 reveal faint launch rings. Rocks arrive on pond 7, larger puzzles on pond 10, optional timed stones on pond 15. Every fifth late pond includes a delayed stone in its certified solution.
+Campaign levels 1–30 are fixed and verified. Level 3 introduces interference; two failed attempts on levels 3–5 reveal faint launch rings. Rocks arrive on level 7, larger puzzles on level 10, optional timed stones on level 15. Every fifth later level includes a delayed stone in its certified solution.
 
 ## Progression
 
@@ -54,10 +56,10 @@ Ponds 1–10 are fixed and verified. Pond 3 introduces interference; two failed 
 - The existing five-level scoring chapters still grant three bonus stars and two coins once, and another two coins for all 15 chapter stars. Completing all ten levels of a lake grants four more coins once. Lantern progress and total stars remain in the small gameplay status pill.
 - Best stone/drop records and the Collection level cards let players revisit unlocked lakes for three stars. Stars, chapter rewards and coins cannot be farmed by repeating a solve. The next locked lake can be unlocked early for three coins after the first solve; completing the preceding lake always unlocks it for free. Only the immediate next lake can be bought, so a purchase never strands the player.
 - When a lake has completed levels below three stars, **Improve level** recommends an unlocked level closest to mastery. Players can return directly to their unlocked journey afterward.
-- Each first solve earns one coin. Players begin with three. After two failed attempts, the Hint dialog offers a solution ring for one coin; after four failed drops, free rings are available regardless of coins. After six, an optional guided layout places the certified solution so the player can watch and learn. Assistance keeps stars and progression.
-- The Daily Trail unlocks after level 3: three puzzles of increasing complexity (8/12/16), seeded by UTC date and stage. All players get identical geometry. Closing and reopening restores the active daily stage and placed stones. Each stage saves independently; finishing all three grows the streak and grants two coins once.
+- Each first journey solve earns one coin. Players begin with three. After two failed attempts, the Hint dialog offers a solution ring for one coin; after four failed drops, free rings are available regardless of coins. After six, an optional guided layout places the certified solution so the player can watch and learn. Assistance keeps stars and progression.
+- The daily puzzle unlocks after level 3. Its first short puzzle pays one coin once per UTC date; the two optional follow-up puzzles complete the shareable trail and grant two more coins once. All three are seeded by UTC date and stage, so players share the same geometry. Closing and reopening restores the current stage and placed stones; finishing the trail grows the streak.
 - The daily share card reports up to 9 stars, total stones, and 3/3 lakes, with clipboard fallback. It contains no ad bonus stars.
-- Twenty-one milestones track levels, three-star solutions, daily trails, stars and daily visits. Completed milestones show a **Claim** action; the coin reward and brief animation occur once, and the result screen points to ready claims. A daily visit gift pays two to seven coins and restarts its streak after a missed UTC day. The Shop sells natural and playful stone skins and lantern finishes for earned coins. Owned items, choices, claims and visits survive reloads. Collection can resume the highest unlocked level.
+- Thirty-six milestones track levels, lake postcards, three-star solutions, daily trails, stars and daily visits. Completed milestones show a **Claim** action; the coin reward and brief animation occur once, and the result screen points to ready claims. A daily visit gift pays two to seven coins and restarts its streak after a missed UTC day. The Shop sells natural and playful stone skins and lantern finishes for earned coins, with new items appearing as players progress. Owned items, choices, claims and visits survive reloads. Collection can resume the highest unlocked level.
 - Three daily goals with small bonuses; replaying a completed pond cannot repeatedly farm its stars or goals.
 - Local save in standalone mode. When the initialized CrazyGames SDK Data module is present, it becomes the save backend. Cloud data is read before writing; a late initialization reconciles earned progress.
 - Mid-level placement, delays, attempts and completed reward screens survive reloads.
@@ -160,6 +162,7 @@ Inspected screenshots of the current desktop release: [lake](docs/desktop.png) a
 - No ads, trackers, third-party assets or network calls other than the official SDK. No Escape/Ctrl+W bindings.
 
 Read [docs/crazygames-release.md](docs/crazygames-release.md) for the portal test checklist and retention measurement plan. Passing repository tests does not mean CrazyGames approval or proven retention. Real ads, guest/account sync and device audio interruptions need the portal preview and physical-device testing.
+For uncoached player sessions and release metrics, use [docs/retention-playtest.md](docs/retention-playtest.md).
 
 Official references: [SDK initialization](https://docs.crazygames.com/sdk/intro/), [game events/settings](https://docs.crazygames.com/sdk/game/), [video ads](https://docs.crazygames.com/sdk/video-ads/), [advertisement requirements](https://docs.crazygames.com/requirements/ads/), [Data](https://docs.crazygames.com/sdk/data/), [quality](https://docs.crazygames.com/requirements/quality/), [gameplay/responsive sizes](https://docs.crazygames.com/requirements/gameplay/), [puzzle monetization](https://docs.crazygames.com/resources/monetizing-puzzle/).
 
@@ -170,7 +173,7 @@ See [the playtest and retention review](docs/playtest-and-retention.md) for the 
 | File | Responsibility |
 |---|---|
 | `simulation.js` | Fixed grid, walls, impulses, RNG, deterministic time |
-| `levels.js`, `scripted.js`, `generator-worker.js` | Construction, certificates, onboarding, pre-generation |
+| `levels.js`, `scripted.js`, `curated.js`, `generator-worker.js` | Construction, certificates, fixed first 30 campaign puzzles, pre-generation |
 | `renderer.js`, `audio.js` | Water shading, lanterns, particles, synthesized sound |
 | `main.js` | Interaction, frame accumulator, progression flow, responsive UI bindings |
 | `progress.js` | Saves, stars, daily goals and streaks |

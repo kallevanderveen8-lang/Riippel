@@ -2,6 +2,7 @@ import { C, lakeForLevel } from './config.js';
 import { Wave, daySeed, cell, distance2 } from './simulation.js';
 import { generate, canPlace, levelName } from './levels.js';
 import { SCRIPTED } from './scripted.js';
+import { CURATED } from './curated.js';
 import { Renderer } from './renderer.js';
 import { Sound } from './audio.js';
 import { Portal } from './sdk.js';
@@ -54,16 +55,17 @@ try {
   worker.onmessage = ({data}) => { const p = pending.get(data.id); if (!p) return; pending.delete(data.id); if (data.error) p.reject(new Error(data.error)); else p.resolve(data.level); };
   worker.onerror = () => { for (const p of pending.values()) p.reject(new Error('Worker unavailable')); pending.clear(); worker.terminate(); worker = null; };
 } catch { worker = null; }
-function fetchLevel(number, seed = number * 7919, daily = false) {
+function fetchLevel(number, seed = number * 7919, daily = false, legacy = false) {
   if (!daily && number <= SCRIPTED.length) return Promise.resolve(structuredClone(SCRIPTED[number - 1]));
-  const key = `${number}:${seed}:${daily}`;
+  if (!daily && !legacy && number>=11 && number<=30 && seed===number*7919) return Promise.resolve({...structuredClone(CURATED[number-11]),generationMs:0});
+  const key = `${number}:${seed}:${daily}:${legacy}`;
   if (!cache.has(key)) cache.set(key, new Promise((resolve, reject) => {
-    if (worker) { const id = ++requestId; pending.set(id, { resolve, reject }); worker.postMessage({ id, number, seed, daily }); }
-    else setTimeout(() => { try { resolve(generate(number, seed, daily)); } catch(e) { reject(e); } }, 0);
-  }).catch(() => generate(number, seed, daily)));
+    if (worker) { const id = ++requestId; pending.set(id, { resolve, reject }); worker.postMessage({ id, number, seed, daily, legacy }); }
+    else setTimeout(() => { try { resolve(generate(number, seed, daily, legacy)); } catch(e) { reject(e); } }, 0);
+  }).catch(() => generate(number, seed, daily, legacy)));
   return cache.get(key);
 }
-function snapshot() { return { number: level.number, seed: level.seed, day: mode === 'daily' ? dailyDay : null, stage: dailyStage, stones, attempts, resetUsed, elapsed, hintCount, completed: phase === 'complete', result }; }
+function snapshot() { return { number: level.number, seed: level.seed, generatorVersion: level.generatorVersion || 2, day: mode === 'daily' ? dailyDay : null, stage: dailyStage, stones, attempts, resetUsed, elapsed, hintCount, completed: phase === 'complete', result }; }
 function save() {
   if (level) progress[mode] = snapshot();
   progress.mode = mode; progress.muted = sound.muted;
@@ -183,17 +185,18 @@ async function enter(newMode = mode) {
   if (level) save(); loading = true; $('loading-status').hidden = false; portal.setLoading(true); syncPause();
   mode = newMode; const saved = progress[mode];
   dailyDay = daySeed();
-  dailyStage = mode === 'daily' ? (saved?.day === dailyDay ? Math.max(0, Math.min(C.dailyLength - 1, saved.stage || 0)) : dailyRun(progress, dailyDay).stage) : 0;
+  dailyStage = mode === 'daily' ? (saved?.day === dailyDay && !saved.completed ? Math.max(0, Math.min(C.dailyLength - 1, saved.stage || 0)) : dailyRun(progress, dailyDay).stage) : 0;
   const number = mode === 'daily' ? C.dailyLevels[dailyStage] : saved?.number || progress.level;
-  const restore = saved && (mode !== 'daily' || saved.day === dailyDay && Number.isInteger(saved.stage));
+  const restore = saved && (mode !== 'daily' || saved.day === dailyDay && saved.stage === dailyStage);
   const seed = mode === 'daily' ? (Math.imul(dailyDay, 2654435761) + dailyStage * 7919) >>> 0 : number * 7919;
-  level = await fetchLevel(number, seed, mode === 'daily'); wave = new Wave(level.rocks);
+  const legacy = !!(restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) === 1 && number > SCRIPTED.length);
+  level = await fetchLevel(number, seed, mode === 'daily', legacy); level.generatorVersion = legacy ? 1 : 2; wave = new Wave(level.rocks);
   stones = restore && Array.isArray(saved.stones) ? saved.stones.slice(0, level.limit).map(s => ({ x: Math.round(Number(s.x)), y: Math.round(Number(s.y)), delay: Math.max(0, Math.min(C.maxDelay, Math.floor(Number(s.delay) || 0))) })).filter((s,i,all) => Number.isFinite(s.x) && Number.isFinite(s.y) && canPlace(s, level, all.slice(0,i))) : [];
   lit = level.lanterns.map(() => false); attempts = restore ? Number(saved.attempts) || 0 : 0; resetUsed = restore ? !!saved.resetUsed : false;
   elapsed = restore ? Number(saved.elapsed) || 0 : 0; hintCount = restore ? Number(saved.hintCount) || 0 : 0; result = restore ? saved.result : null;
   phase = restore && saved.completed ? 'complete' : 'ready'; if (phase === 'complete') lit.fill(true);
   undoStack=[];lastPlacement=stones.map(s=>({...s}));
-  pointer = null; hover = null; keyboardPoint = {x:64,y:64}; celebration = 0; renderer.zoom = 0; renderer.resetCamera(); renderer.bursts = []; loading = false; $('loading-status').hidden = true; portal.setLoading(false);
+  pointer = null; hover = null; keyboardPoint = {x:64,y:64}; celebration = 0; renderer.zoom = 0; renderer.resetCamera(); renderer.bursts = []; renderer.failure = null; loading = false; $('loading-status').hidden = true; portal.setLoading(false);
   portal.context({ level: number, mode, dailyStage: mode === 'daily' ? dailyStage + 1 : 0 });
   applyTheme(); applyPreferences(); setInstruction(defaultInstruction()); refresh(); overlay(); syncPause(); save(); maybeShowWelcome();
   if (mode === 'campaign') fetchLevel(number + 1).catch(() => {});
@@ -209,6 +212,7 @@ function renderDiscoveries() {
   $('jump-keepsakes').classList.toggle('has-reward',items.some(d=>d.ready));
   for (const d of items) {
     const card = document.createElement('div'); card.className = `discovery${d.earned ? ' earned' : ''}${d.ready?' ready':''}`;card.dataset.discovery=d.id;card.tabIndex=-1;
+    if (Number.isInteger(d.postcard)) { const image=document.createElement('img');image.className='postcard-art';image.src=renderer.thumbnail(lakeForLevel(d.postcard*C.lakeLength+1).theme);image.alt='';card.append(image); }
     const title = document.createElement('strong'); title.textContent = d.name;
     const detail = document.createElement('span'); detail.textContent = d.detail;
     const meter = document.createElement('progress'); meter.max = d.target; meter.value = Math.min(d.target,d.value); meter.setAttribute('aria-label',d.detail);
@@ -233,13 +237,14 @@ function renderShop() {
   for(const [kind,label] of [['stones','Stones'],['lanterns','Lanterns']]) {
     const group=document.createElement('section'),heading=document.createElement('h3'),grid=document.createElement('div');
     group.className='shop-group';heading.textContent=label;grid.className='shop-grid';group.append(heading,grid);
-    for(const item of C.cosmetics[kind]) {
+    for(const item of C.cosmetics[kind].filter(item=>!item.unlockLevel || item.unlockLevel<=progress.level+10)) {
       const owned=progress.cosmetics[kind].includes(item.id),selected=progress.cosmetics[kind==='stones'?'stone':'lantern']===item.id;
+      const locked=progress.level<(item.unlockLevel||1);
       const card=document.createElement('div'),image=document.createElement('img'),meta=document.createElement('div'),name=document.createElement('strong'),type=document.createElement('small'),button=document.createElement('button');
-      card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);
+      card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);card.classList.toggle('locked',locked);
       image.src=renderer.cosmeticPreview(kind,item.id);image.alt='';name.textContent=item.name;type.textContent=item.kind;meta.append(name,type);
-      button.textContent=selected?'Equipped':owned?'Equip':`${item.cost} coins`;
-      button.disabled=selected||(!owned&&progress.tokens<item.cost);button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':`Buy for ${item.cost} coins`}: ${item.name}`);
+      button.textContent=selected?'Equipped':owned?'Equip':locked?`Level ${item.unlockLevel}`:`${item.cost} coins`;
+      button.disabled=selected||locked||(!owned&&progress.tokens<item.cost);button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':locked?`Unlocks at level ${item.unlockLevel}`:`Buy for ${item.cost} coins`}: ${item.name}`);
       button.onclick=()=>{
         const success=owned?equipCosmetic(progress,kind,item.id):buyCosmetic(progress,kind,item.id);
         if(!success)return;
@@ -273,7 +278,7 @@ function refresh() {
   $('undo').disabled = !undoStack.length || phase!=='ready' || paused();
   $('mobile-stars').textContent = $('journal-stars').textContent = total;
   $('journal-balance').textContent = progress.tokens;
-  const today=daySeed(), todayDone=!!progress.dailyResults[today]?.trail, giftClaimed=progress.dailyGift.lastDay===today;
+  const today=daySeed(), todayDone=!!progress.dailyResults[today]?.trail, todayQuick=!!(progress.dailyResults[today]?.quick||todayDone), giftClaimed=progress.dailyGift.lastDay===today;
   const giftDay=progress.dailyGift.lastDay===today-1 ? progress.dailyGift.streak+1 : 1;
   const giftCoins=C.dailyGiftCoins[(giftDay-1)%C.dailyGiftCoins.length];
   $('daily').replaceChildren(icon(giftClaimed?'calendar':'coin'));
@@ -285,9 +290,9 @@ function refresh() {
   $('daily-gift-title').textContent=giftClaimed?'See you tomorrow':`Day ${giftDay} reward`;
   $('daily-gift-detail').textContent=giftClaimed?`${progress.dailyGift.streak} day visit streak`:'One reward each day you return.';
   $('journal-daily').disabled = mode!=='daily' && progress.level <= C.dailyUnlock;
-  $('journal-daily').textContent = mode==='daily'?'Return to journey':progress.level <= C.dailyUnlock ? 'Unlocks after level 3' : todayDone ? 'Replay today’s trail' : 'Play daily trail';
-  $('daily-title').textContent = 'Daily trail';
-  $('daily-teaser').textContent = progress.level > C.dailyUnlock ? (todayDone ? 'Complete today · New puzzles at 00:00 UTC.' : 'Three shared puzzles. Earn coins by finishing.') : 'Unlocks after level 3.';
+  $('journal-daily').textContent = mode==='daily'?'Return to journey':progress.level <= C.dailyUnlock ? 'Unlocks after level 3' : todayDone ? 'Replay today’s trail' : todayQuick ? 'Continue daily trail' : 'Play today’s puzzle';
+  $('daily-title').textContent = todayQuick ? 'Today’s ripple ✓' : 'One daily ripple';
+  $('daily-teaser').textContent = progress.level > C.dailyUnlock ? (todayDone ? 'Trail complete · New puzzle at 00:00 UTC.' : todayQuick ? 'Daily puzzle complete. Two more in the optional trail.' : 'One quick puzzle for a coin. Continue for a three-puzzle trail.') : 'Unlocks after level 3.';
   $('jump-keepsakes').classList.toggle('has-reward',readyDiscoveries(progress).length>0);
   $('sound').disabled = !!portal.muteAudio; $('sound').title = portal.muteAudio ? 'Muted by CrazyGames' : '';
   $('sound').classList.toggle('is-muted',sound.muted || portal.muteAudio);
@@ -332,6 +337,7 @@ function overlay() {
   const wasHidden = $('overlay').hidden;
   $('overlay').hidden = !manualPause && phase !== 'complete';
   $('overlay').classList.toggle('is-paused',manualPause);
+  $('overlay').classList.toggle('lake-finale',!manualPause && phase==='complete' && !!result?.lakeReward);
   $('result-stats').hidden = manualPause;
   $('pause-details').hidden = $('pause-actions').hidden = !manualPause;
   document.querySelector('.result-secondary').hidden = manualPause;
@@ -349,12 +355,14 @@ function overlay() {
   $('overlay-kicker').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage+1} OF ${C.dailyLength}` : `LEVEL ${String(level.number).padStart(2,'0')} COMPLETE`;
   $('reward-stars').replaceChildren(...Array.from({length:3},(_,i)=>icon('star',i<(result?.stars||3)?'earned':'')));
   $('reward-stars').setAttribute('role','img'); $('reward-stars').setAttribute('aria-label',`${result?.stars||3} of 3 stars`);
-  $('overlay-title').textContent = result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
+  $('overlay-title').textContent = result?.lakeReward ? 'A whole lake alight.' : result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
   $('result-stats').replaceChildren(...[[stones.length,'Stones used'],[attempts,'Drops'],[`+${result?.gained||0}`,'Stars earned']].map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
-  const detail = result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
+  const detail = mode==='daily' ? dailyStage===0 ? `Daily ripple complete${result?.coinsGained?` · +${result.coinsGained} coin`:''}` : dailyStage===C.dailyLength-1 ? `Trail complete${result?.coinsGained?` · +${result.coinsGained} coins`:''}` : 'Trail puzzle complete' : result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
   const dailyDone = mode === 'daily' && dailyStage === C.dailyLength - 1;
-  $('overlay-text').textContent = `${detail}${dailyDone ? `\nTrail complete · ${progress.streak} day streak · +${C.dailyTokens} coins on first finish` : mode === 'campaign' && level.number === 3 ? '\nDaily trail unlocked. Three new puzzles every day.' : ''}`;
-  action('next',mode === 'daily' ? (dailyDone ? 'Back to your journey' : `Daily puzzle ${dailyStage + 2}`) : 'Next level','arrow-right');
+  $('overlay-text').textContent = `${detail}${dailyDone ? `\n${progress.streak} day trail streak` : mode === 'campaign' && level.number === 3 ? '\nDaily puzzle unlocked. One quick puzzle each day.' : ''}`;
+  action('next',mode === 'daily' ? 'Back to your journey' : 'Next level','arrow-right');
+  $('daily-continue').hidden = mode!=='daily' || dailyDone || daySeed()!==dailyDay;
+  if (!$('daily-continue').hidden) action('daily-continue',`Continue trail · ${dailyStage+2}/${C.dailyLength}`,'arrow-right');
   $('copy').hidden = !dailyDone; $('copy').textContent = 'Copy daily result';
   const rewards = [...(result?.newLake ? [`Next lake · ${result.newLake}`] : []), ...((result?.discoveries || []).length ? [`${result.discoveries.length} milestone${result.discoveries.length===1?'':'s'} ready to claim in Collection`] : [])];
   if (result?.goalBonus) rewards.push(`Daily goals completed · +${result.goalBonus} stars`);
@@ -368,7 +376,7 @@ function rewardKey() { return mode === 'daily' ? `d${dailyDay}-${dailyStage}` : 
 function drop() {
   if (phase !== 'ready' || paused() || !stones.length) return;
   touched = true; attempts++; drops++; phase = 'running'; wave.reset(stones); lit.fill(false); sound.unlock(); sound.splash();
-  setInstruction('Watch your ripples meet.'); $('hint-finger').classList.remove('visible'); refresh(); save();
+  renderer.failure=null;setInstruction('Watch your ripples meet.'); $('hint-finger').classList.remove('visible'); refresh(); save();
 }
 function win() {
   phase = 'celebrate'; celebration = 0; renderer.zoom = 1; sound.chime(lit.length);
@@ -376,9 +384,11 @@ function win() {
 function finishWin() {
   phase = 'complete'; renderer.zoom = 0;
   finishTutorial();
+  const coinsBefore=progress.tokens;
   result = complete(progress, rewardKey(), stones.length, level.par, resetUsed, { attempts, elapsed });
   if (mode === 'campaign') { progress.level = Math.max(progress.level, level.number + 1); portal.milestone(progress.level - 1); }
-  else finishDaily(progress, dailyDay, dailyStage, result, stones.length);
+  else { finishDaily(progress, dailyDay, dailyStage, result, stones.length);result.discoveries=readyDiscoveries(progress); }
+  result.coinsGained=progress.tokens-coinsBefore;
   portal.happy(); syncPause(); refresh(); overlay(); save();
   // Natural break only. A rewarded ad shares the same cooldown, so never chained.
   if (result.first) portal.ad('midgame', Object.keys(progress.stars).length).then(() => refresh());
@@ -386,14 +396,16 @@ function finishWin() {
 function tick(dt) {
   globalTime += dt; if (phase === 'ready' || phase === 'running') elapsed += dt;
   if (phase === 'running') {
-    for (let s = 0; s < C.stepsPerTick; s++) {
+    for (let s = 0; s < (attempts>1 ? C.retryStepsPerTick : C.stepsPerTick); s++) {
       wave.step();
       level.lanterns.forEach((l,i) => { if (!lit[i] && wave.peak[cell(l.x,l.y)] >= C.threshold) { lit[i] = true; renderer.burst(l.x,l.y,globalTime); sound.chime(lit.filter(Boolean).length - 1); refresh(); } });
       if (lit.every(Boolean)) { win(); break; }
       if (wave.stepNumber >= C.steps) {
         phase = 'ready';
         const hint = level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures;
-        setInstruction(attempts >= C.freeHelpFailures ? `${lit.filter(Boolean).length}/${lit.length} lit. Free guidance is available in Help.` : hint ? 'Two waves meeting make a BIG wave. Try the faint rings.' : `${lit.filter(Boolean).length} of ${lit.length} lit. Move a stone and try again.`,true);
+        const weak = level.lanterns.map((l,i)=>({i,ratio:wave.peak[cell(l.x,l.y)]/C.threshold})).filter(p=>!lit[p.i]).sort((a,b)=>b.ratio-a.ratio)[0];
+        renderer.failure=weak?.i ?? null;
+        setInstruction(attempts >= C.freeHelpFailures ? `${lit.filter(Boolean).length}/${lit.length} lit. Free guidance is available in Help.` : hint ? 'Two waves meeting make a BIG wave. Try the faint rings.' : weak?.ratio>=.7 ? `${lit.filter(Boolean).length}/${lit.length} lit. The marked lantern is close; shift a stone slightly.` : `${lit.filter(Boolean).length}/${lit.length} lit. Bring two ripples together by the marked lantern.`,true);
         refresh(); save(); break;
       }
     }
@@ -425,7 +437,7 @@ function point(e) { return renderer.point(e.clientX, e.clientY); }
 function edited(record=true) {
   if(record&&JSON.stringify(lastPlacement)!==JSON.stringify(stones)){undoStack.push(lastPlacement);if(undoStack.length>30)undoStack.shift();}
   lastPlacement=stones.map(s=>({...s}));
-  wave.reset(); lit.fill(false); setInstruction(defaultInstruction()); touched = true; sound.place(); refresh(); save();
+  wave.reset(); lit.fill(false); renderer.failure=null;setInstruction(defaultInstruction()); touched = true; sound.place(); refresh(); save();
 }
 function undoEdit(){if(!undoStack.length||phase!=='ready'||paused())return;cancelPointer();stones=undoStack.pop().map(s=>({...s}));edited(false);setInstruction('Last edit undone. Keep exploring.');}
 function cancelPointer() {
@@ -498,8 +510,8 @@ $('next').onclick = async () => {
   if (manualPause) { manualPause = false; syncPause(); refresh(); overlay(); return; }
   if (phase !== 'complete') return;
   if (mode === 'daily') {
-    if (dailyStage < C.dailyLength - 1 && daySeed() === dailyDay) { progress.daily = { day: dailyDay, stage: dailyStage + 1 }; level = null; await enter('daily'); }
-    else await enter('campaign'); return;
+    if (progress.campaign?.completed) progress.campaign={number:progress.level};
+    await enter('campaign'); return;
   }
   const nextNumber = level.number + 1; progress.campaign = { number: nextNumber }; level = null; await enter('campaign');
 };
@@ -554,6 +566,10 @@ $('reroll-token').onclick = () => { if (!progress.goals.rerolled && spend(progre
 $('replay').onclick = async () => {
   if (phase !== 'complete' || adPaused) return;
   progress[mode] = { number:level.number, day:dailyDay, stage:dailyStage }; level = null; await enter();
+};
+$('daily-continue').onclick = async () => {
+  if (mode!=='daily'||phase!=='complete'||dailyStage>=C.dailyLength-1||daySeed()!==dailyDay||loading||adPaused)return;
+  progress.daily={day:dailyDay,stage:dailyStage+1};level=null;await enter('daily');
 };
 $('dock').onclick = () => { progress.preferences.dockTop = !progress.preferences.dockTop; applyPreferences(); save(); $('controls-dialog').close(); };
 $('copy').onclick = async () => {
@@ -637,7 +653,7 @@ for (const [index,tab] of journalTabs.entries()) {
     if (next !== null) { event.preventDefault(); showJournalTab(journalTabs[next].dataset.panel,true); }
   };
 }
-$('journal-daily').onclick = async () => { if (loading || adPaused || (mode!=='daily'&&progress.level<=C.dailyUnlock)) return; $('collection-dialog').close(); manualPause = false; await enter(mode==='daily'?'campaign':'daily'); };
+$('journal-daily').onclick = async () => { if (loading || adPaused || (mode!=='daily'&&progress.level<=C.dailyUnlock)) return; $('collection-dialog').close(); manualPause = false; if(mode!=='daily'&&progress.dailyResults[daySeed()]?.trail){save();progress.daily={day:daySeed(),stage:0};level=null;} await enter(mode==='daily'?'campaign':'daily'); };
 $('claim-daily').onclick = () => { const gift=claimDailyGift(progress);if(!gift)return;save();refresh();renderDiscoveries();renderShop();showRewardToast(`Day ${gift.streak} reward`,`+${gift.reward} coins`); };
 for(const button of $('theme-options').querySelectorAll('button'))button.onclick=()=>{if(setLakeLight(progress,activeLakeNumber(),button.dataset.light)){applyTheme();save();showRewardToast(button.dataset.light==='day'?'Daylight selected':'Nightfall selected',lakeForLevel(activeLakeNumber()).name);} };
 $('journal-back').onclick = () => $('collection-dialog').close();
