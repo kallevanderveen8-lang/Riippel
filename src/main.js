@@ -1,11 +1,11 @@
-import { C } from './config.js';
+import { C, lakeForLevel } from './config.js';
 import { Wave, daySeed, cell, distance2 } from './simulation.js';
-import { generate, canPlace } from './levels.js';
+import { generate, canPlace, levelName } from './levels.js';
 import { SCRIPTED } from './scripted.js';
 import { Renderer } from './renderer.js';
 import { Sound } from './audio.js';
 import { Portal } from './sdk.js';
-import { parseProgress, totalStars, goals, complete, rollDay, chapter, chapterProgress, masteryTarget, discoveries, spend, buyNextLake, dailyRun, finishDaily } from './progress.js';
+import { parseProgress, totalStars, goals, complete, rollDay, masteryTarget, discoveries, readyDiscoveries, claimDiscovery, lightForLake, setLakeLight, claimDailyGift, buyCosmetic, equipCosmetic, spend, buyNextLake, dailyRun, finishDaily } from './progress.js';
 
 const $ = id => document.getElementById(id), canvas = $('pond'), sound = new Sound(), renderer = new Renderer(canvas);
 const iconPaths = {
@@ -80,7 +80,18 @@ function syncPause(visibilityOnly = false) {
   }
   last = performance.now(); accumulator = 0;
 }
-function applyTheme() { const theme = C.themes[progress.theme]; renderer.theme = theme; sound.muted = progress.muted; sound.setTheme(theme); sound.sync(); document.documentElement.style.setProperty('--accent', theme.accent); document.documentElement.style.setProperty('--menu-scene',`url("${renderer.thumbnail(theme)}")`); $('theme-name').textContent = theme.name; $('theme-description').textContent = theme.description; }
+function activeLakeNumber() { return mode === 'daily' ? progress.level : level?.number || progress.level; }
+function applyTheme() {
+  const lake=lakeForLevel(activeLakeNumber()), theme=lake.theme, light=lightForLake(progress,activeLakeNumber());
+  renderer.theme=theme; renderer.timeOfDay=light; renderer.cosmetics=progress.cosmetics;
+  sound.muted=progress.muted; sound.setTheme(theme); sound.sync();
+  document.documentElement.style.setProperty('--accent',theme.accent);
+  document.documentElement.style.setProperty('--menu-scene',`url("${renderer.thumbnail(theme)}")`);
+  $('theme-name').textContent=lake.name; $('theme-description').textContent=theme.description;
+  $('light-lake-range').textContent=`LEVELS ${String(lake.first).padStart(2,'0')}–${String(lake.last).padStart(2,'0')}`;
+  $('light-preview').src=renderer.thumbnail(theme); $('light-preview').classList.toggle('night',light==='night');
+  for(const button of $('theme-options').querySelectorAll('button')) button.setAttribute('aria-pressed',String(button.dataset.light===light));
+}
 function applyPreferences() {
   const preferences = progress.preferences;
   sound.ambientEnabled = preferences.ambientSound; sound.sync();
@@ -102,12 +113,13 @@ function setInstruction(text, visible = false) {
   $('feedback').hidden = !visible;
   if (visible) { $('feedback').textContent = text; revealPanel($('feedback')); feedbackTimer = setTimeout(()=>{ $('feedback').hidden = true; },4200); }
 }
-let inventoryTheme, inventoryArtVersion = -1, previousLit = 0;
+let inventoryTheme, inventorySkin, inventoryArtVersion = -1, previousLit = 0;
 function renderInventory() {
   const tray = $('stone-tray');
-  if (tray.children.length !== level.limit || inventoryTheme !== renderer.theme || inventoryArtVersion !== renderer.artVersion) {
+  if (tray.children.length !== level.limit || inventoryTheme !== renderer.theme || inventorySkin !== progress.cosmetics.stone || inventoryArtVersion !== renderer.artVersion) {
     tray.replaceChildren(...Array.from({length:level.limit},(_,i)=>{const stone=document.createElement('i');stone.className='inventory-stone';stone.style.backgroundImage=`url("${renderer.stonePreview(i)}")`;return stone;}));
     inventoryTheme = renderer.theme;
+    inventorySkin = progress.cosmetics.stone;
     inventoryArtVersion = renderer.artVersion;
   }
   [...tray.children].forEach((stone,i)=>stone.classList.toggle('used',i<stones.length));
@@ -192,45 +204,91 @@ function renderGoals(target) {
   items.forEach((g,i) => { const row = document.createElement('div'); row.className = `goal${progress.goals.claimed.includes(i) ? ' complete' : ''}`; const mark = document.createElement('span'); mark.className = 'check'; if(progress.goals.claimed.includes(i))mark.append(icon('check')); const label = document.createElement('span'); label.textContent = g.title; const small = document.createElement('small'); small.textContent = `${Math.min(g.target, g.value)} / ${g.target}`; label.append(small); row.append(mark, label); target.append(row); });
 }
 function renderDiscoveries() {
-  const items = discoveries(progress), target = $('discoveries'); target.replaceChildren();
-  $('discovery-count').textContent = `${items.filter(d => d.earned).length} / ${items.length} collected`;
+  const items = discoveries(progress).sort((a,b)=>Number(b.ready)-Number(a.ready)||Number(a.earned)-Number(b.earned)||a.target-b.target), target = $('discoveries'); target.replaceChildren();
+  $('discovery-count').textContent = `${items.filter(d=>d.earned).length}/${items.length} claimed${items.some(d=>d.ready)?` · ${items.filter(d=>d.ready).length} ready`:''}`;
+  $('jump-keepsakes').classList.toggle('has-reward',items.some(d=>d.ready));
   for (const d of items) {
-    const card = document.createElement('div'); card.className = `discovery${d.earned ? ' earned' : ''}`;
+    const card = document.createElement('div'); card.className = `discovery${d.earned ? ' earned' : ''}${d.ready?' ready':''}`;card.dataset.discovery=d.id;card.tabIndex=-1;
     const title = document.createElement('strong'); title.textContent = d.name;
     const detail = document.createElement('span'); detail.textContent = d.detail;
     const meter = document.createElement('progress'); meter.max = d.target; meter.value = Math.min(d.target,d.value); meter.setAttribute('aria-label',d.detail);
-    const caption = document.createElement('small'); caption.textContent = `${Math.min(d.target,d.value)} / ${d.target} · ${d.earned ? 'Collected' : `+${d.reward} coins`}`;
-    card.append(icon(d.earned?'award':'lake'),title,detail,meter,caption); target.append(card);
+    const caption = document.createElement('small'); caption.textContent = `${Math.min(d.target,d.value)} / ${d.target}${d.earned?' · Claimed':d.ready?'':` · +${d.reward} coins`}`;
+    card.append(icon(d.earned?'check':d.ready?'award':'lake'),title,detail,meter,caption);
+    if(d.ready){const claim=document.createElement('button');claim.className='claim-milestone primary';claim.textContent=`Claim · +${d.reward} coins`;claim.onclick=()=>{
+      const reward=claimDiscovery(progress,d.id);if(!reward)return;
+      save();refresh();renderDiscoveries();
+      const earned=target.querySelector(`[data-discovery="${d.id}"]`);earned?.focus({preventScroll:true});
+      if(earned&&!reducedMotion.matches&&!progress.preferences.reducedMotion)earned.animate([
+        {transform:'scale(.96)',boxShadow:'0 0 0 0 #f2d99a00'},
+        {transform:'scale(1.025)',boxShadow:'0 0 0 6px #f2d99a55',offset:.5},
+        {transform:'scale(1)',boxShadow:'0 0 0 0 #f2d99a00'}
+      ],{duration:560,easing:'ease-out'});
+      showRewardToast(reward.name,`+${reward.reward} coins`);
+    };card.append(claim);}
+    target.append(card);
   }
+}
+function renderShop() {
+  const target=$('shop-items');target.replaceChildren();
+  for(const [kind,label] of [['stones','Stones'],['lanterns','Lanterns']]) {
+    const group=document.createElement('section'),heading=document.createElement('h3'),grid=document.createElement('div');
+    group.className='shop-group';heading.textContent=label;grid.className='shop-grid';group.append(heading,grid);
+    for(const item of C.cosmetics[kind]) {
+      const owned=progress.cosmetics[kind].includes(item.id),selected=progress.cosmetics[kind==='stones'?'stone':'lantern']===item.id;
+      const card=document.createElement('div'),image=document.createElement('img'),meta=document.createElement('div'),name=document.createElement('strong'),type=document.createElement('small'),button=document.createElement('button');
+      card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);
+      image.src=renderer.cosmeticPreview(kind,item.id);image.alt='';name.textContent=item.name;type.textContent=item.kind;meta.append(name,type);
+      button.textContent=selected?'Equipped':owned?'Equip':`${item.cost} coins`;
+      button.disabled=selected||(!owned&&progress.tokens<item.cost);button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':`Buy for ${item.cost} coins`}: ${item.name}`);
+      button.onclick=()=>{
+        const success=owned?equipCosmetic(progress,kind,item.id):buyCosmetic(progress,kind,item.id);
+        if(!success)return;
+        renderer.cosmetics=progress.cosmetics;save();refresh();renderShop();
+        target.querySelector(`[data-item="${item.id}"] button`)?.focus({preventScroll:true});
+        showRewardToast(item.name,owned?'Equipped':`Purchased · ${item.cost} coins`);
+      };
+      card.append(image,meta,button);grid.append(card);
+    }
+    target.append(group);
+  }
+}
+let rewardToastTimer;
+function showRewardToast(title,detail) {
+  const toast=$('reward-toast');clearTimeout(rewardToastTimer);
+  $('reward-toast-title').textContent=title;$('reward-toast-detail').textContent=detail;
+  toast.hidden=false;toast.getAnimations().forEach(animation=>animation.cancel());
+  if(!reducedMotion.matches&&!progress.preferences.reducedMotion) toast.animate([{opacity:0,transform:'translate(-50%,12px) scale(.96)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],{duration:360,easing:'cubic-bezier(.18,.8,.24,1)'});
+  rewardToastTimer=setTimeout(()=>{toast.hidden=true;},3400);
 }
 function refresh() {
   if (!level) return;
-  const total = totalStars(progress), nextTheme = C.themes.find(t => t.unlock > total);
-  $('level-label').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage + 1} / ${C.dailyLength}` : `LAKE ${String(level.number).padStart(2,'0')}`;
+  const total = totalStars(progress);
+  $('level-label').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage + 1} / ${C.dailyLength}` : `LEVEL ${String(level.number).padStart(2,'0')}`;
   $('level-name').textContent = level.name;
-  const ch = chapterProgress(progress, level.number);
-  $('chapter-progress').textContent = mode === 'daily' ? `${new Date(dailyDay * 86400000).toISOString().slice(0,10)} · Shared daily trail` : `Chapter ${ch.index+1} · ${ch.solved} of ${C.chapterLength} lakes complete`;
+  const lake=lakeForLevel(level.number),solved=Array.from({length:C.lakeLength},(_,i)=>progress.stars[`l${lake.first+i}`]).filter(Boolean).length;
+  $('chapter-progress').textContent = mode === 'daily' ? `${new Date(dailyDay * 86400000).toISOString().slice(0,10)} · Shared daily trail` : `${lake.name} · ${solved} of ${C.lakeLength} levels complete`;
   $('app').classList.toggle('is-watching', phase === 'running' || phase === 'celebrate'); $('par').textContent = `PAR ${level.par}`;
   renderInventory();
   $('attempt-label').textContent = attempts ? `Drop ${attempts}` : 'Take your time'; $('drop').disabled = !stones.length || phase !== 'ready' || paused(); $('reset').disabled = !stones.length || phase !== 'ready' || paused();
   $('undo').disabled = !undoStack.length || phase!=='ready' || paused();
-  $('total-stars').textContent = $('mobile-stars').textContent = $('journal-stars').textContent = total;
+  $('mobile-stars').textContent = $('journal-stars').textContent = total;
   $('journal-balance').textContent = progress.tokens;
-  $('next-theme').textContent = nextTheme ? `Next: ${nextTheme.name}` : 'All landscapes unlocked'; $('unlock-count').textContent = nextTheme ? `${total} / ${nextTheme.unlock}` : '✧';
-  const previousUnlock = C.themes.filter(t => t.unlock <= total).at(-1).unlock;
-  const themePercent = nextTheme ? (total-previousUnlock)/(nextTheme.unlock-previousUnlock)*100 : 100;
-  $('theme-progress').style.width = `${themePercent}%`;
-  $('theme-progress').parentElement.setAttribute('aria-valuenow',Math.round(themePercent));
-  $('theme-progress').parentElement.setAttribute('aria-valuetext',nextTheme ? `${total} of ${nextTheme.unlock} stars for ${nextTheme.name}` : 'All landscapes unlocked');
-  $('daily').title = progress.level > C.dailyUnlock ? 'Play today’s shared lake' : 'Unlocks after lake 3';
-  const todayDone = !!progress.dailyResults[daySeed()]?.trail;
-  $('daily').replaceChildren(icon(mode==='daily'?'lake':todayDone?'check':'calendar'));
-  $('daily').setAttribute('aria-label',mode === 'daily' ? 'Return to journey' : todayDone ? 'Replay today’s daily trail' : 'Play daily trail');
-  $('daily').dataset.tooltip = progress.level > C.dailyUnlock ? $('daily').getAttribute('aria-label') : 'Daily trail · unlocks after lake 3';
-  $('journal-daily').disabled = progress.level <= C.dailyUnlock;
-  $('journal-daily').textContent = progress.level <= C.dailyUnlock ? 'Unlocks after lake 3' : todayDone ? 'Replay today’s trail' : 'Play daily trail';
-  $('daily-title').textContent = progress.level > C.dailyUnlock ? `${Object.values(progress.dailyResults).filter(r=>r?.trail).length} trails completed · ${progress.streak || 0} day streak` : 'A lake to share';
-  $('daily-teaser').textContent = progress.level > C.dailyUnlock ? (todayDone ? 'Today’s trail is complete. New lakes arrive at 00:00 UTC.' : 'Three shared lakes. Earn coins by finishing.') : 'Daily trail unlocks after lake 3.';
+  const today=daySeed(), todayDone=!!progress.dailyResults[today]?.trail, giftClaimed=progress.dailyGift.lastDay===today;
+  const giftDay=progress.dailyGift.lastDay===today-1 ? progress.dailyGift.streak+1 : 1;
+  const giftCoins=C.dailyGiftCoins[(giftDay-1)%C.dailyGiftCoins.length];
+  $('daily').replaceChildren(icon(giftClaimed?'calendar':'coin'));
+  $('daily').classList.toggle('has-reward',!giftClaimed);
+  $('daily').setAttribute('aria-label',giftClaimed?'Today’s trail':'Daily reward ready');
+  $('daily').dataset.tooltip=$('daily').getAttribute('aria-label');
+  $('claim-daily').disabled=giftClaimed;
+  $('claim-daily').textContent=giftClaimed?'Claimed today':`Claim · +${giftCoins} coins`;
+  $('daily-gift-title').textContent=giftClaimed?'See you tomorrow':`Day ${giftDay} reward`;
+  $('daily-gift-detail').textContent=giftClaimed?`${progress.dailyGift.streak} day visit streak`:'One reward each day you return.';
+  $('journal-daily').disabled = mode!=='daily' && progress.level <= C.dailyUnlock;
+  $('journal-daily').textContent = mode==='daily'?'Return to journey':progress.level <= C.dailyUnlock ? 'Unlocks after level 3' : todayDone ? 'Replay today’s trail' : 'Play daily trail';
+  $('daily-title').textContent = 'Daily trail';
+  $('daily-teaser').textContent = progress.level > C.dailyUnlock ? (todayDone ? 'Complete today · New puzzles at 00:00 UTC.' : 'Three shared puzzles. Earn coins by finishing.') : 'Unlocks after level 3.';
+  $('jump-keepsakes').classList.toggle('has-reward',readyDiscoveries(progress).length>0);
   $('sound').disabled = !!portal.muteAudio; $('sound').title = portal.muteAudio ? 'Muted by CrazyGames' : '';
   $('sound').classList.toggle('is-muted',sound.muted || portal.muteAudio);
   $('sound').setAttribute('aria-pressed',String(sound.muted || portal.muteAudio));
@@ -240,7 +298,7 @@ function refresh() {
   $('setting-sound-note').textContent = portal.muteAudio ? 'Sound is controlled by CrazyGames' : 'All game audio';
   $('setting-sound-note').classList.toggle('sr-only',!portal.muteAudio);
   $('setting-ambience').disabled = sound.muted || !!portal.muteAudio;
-  $('settings-context').textContent = mode === 'daily' ? `Daily trail · Lake ${dailyStage + 1}` : `Lake ${String(level.number).padStart(2,'0')} · ${level.name}`;
+  $('settings-context').textContent = mode === 'daily' ? `Daily trail · Puzzle ${dailyStage + 1}` : `Level ${String(level.number).padStart(2,'0')} · ${lake.name}`;
   $('pause').setAttribute('aria-label',manualPause ? 'Resume game' : 'Pause game');
   $('pause').setAttribute('aria-pressed',String(manualPause));
   $('sound').dataset.tooltip = $('sound').getAttribute('aria-label'); $('pause').dataset.tooltip = $('pause').getAttribute('aria-label');
@@ -288,22 +346,20 @@ function overlay() {
   $('overlay-text').hidden = false;
   $('replay').hidden = false; action('replay','Play again','reset',true); $('replay').title = (result?.stars || 3) < 3 ? `Aim for ${level.par} stones to earn three stars` : 'Replay to beat your record';
   action('result-journal','Collection','journal',true);
-  $('overlay-kicker').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage+1} OF ${C.dailyLength}` : `LAKE ${String(level.number).padStart(2,'0')} COMPLETE`;
+  $('overlay-kicker').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage+1} OF ${C.dailyLength}` : `LEVEL ${String(level.number).padStart(2,'0')} COMPLETE`;
   $('reward-stars').replaceChildren(...Array.from({length:3},(_,i)=>icon('star',i<(result?.stars||3)?'earned':'')));
   $('reward-stars').setAttribute('role','img'); $('reward-stars').setAttribute('aria-label',`${result?.stars||3} of 3 stars`);
   $('overlay-title').textContent = result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
   $('result-stats').replaceChildren(...[[stones.length,'Stones used'],[attempts,'Drops'],[`+${result?.gained||0}`,'Stars earned']].map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
-  const detail = result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
+  const detail = result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
   const dailyDone = mode === 'daily' && dailyStage === C.dailyLength - 1;
-  $('overlay-text').textContent = `${detail}${dailyDone ? `\nTrail complete · ${progress.streak} day streak · +${C.dailyTokens} coins on first finish` : mode === 'campaign' && level.number === 3 ? '\nDaily trail unlocked. Three new lakes every day.' : ''}`;
-  action('next',mode === 'daily' ? (dailyDone ? 'Back to your journey' : `Daily lake ${dailyStage + 2}`) : 'Next lake','arrow-right');
+  $('overlay-text').textContent = `${detail}${dailyDone ? `\nTrail complete · ${progress.streak} day streak · +${C.dailyTokens} coins on first finish` : mode === 'campaign' && level.number === 3 ? '\nDaily trail unlocked. Three new puzzles every day.' : ''}`;
+  action('next',mode === 'daily' ? (dailyDone ? 'Back to your journey' : `Daily puzzle ${dailyStage + 2}`) : 'Next level','arrow-right');
   $('copy').hidden = !dailyDone; $('copy').textContent = 'Copy daily result';
-  const rewards = [...(result?.themesUnlocked || []).map(name=>`New landscape · ${name}`), ...(result?.discoveries || []).map(d=>`${d.name} collected · +${d.reward} coins`)];
+  const rewards = [...(result?.newLake ? [`Next lake · ${result.newLake}`] : []), ...((result?.discoveries || []).length ? [`${result.discoveries.length} milestone${result.discoveries.length===1?'':'s'} ready to claim in Collection`] : [])];
   if (result?.goalBonus) rewards.push(`Daily goals completed · +${result.goalBonus} stars`);
   if (result?.masteryReward) rewards.unshift(`Chapter mastered · +${C.masteryTokens} coins`);
   $('result-discovery').textContent = rewards.join('\n');
-  const nextTheme = C.themes.find(t=>t.unlock>totalStars(progress));
-  if (nextTheme) $('result-discovery').textContent += `${rewards.length?'\n':''}${nextTheme.unlock-totalStars(progress)} stars until ${nextTheme.name}`;
   $('result-discovery').hidden = !$('result-discovery').textContent;
   if(!$('overlay').hidden && $('overlay').contains(document.activeElement) && !document.activeElement.getClientRects().length) $('next').focus({preventScroll:true});
 
@@ -447,11 +503,7 @@ $('next').onclick = async () => {
   }
   const nextNumber = level.number + 1; progress.campaign = { number: nextNumber }; level = null; await enter('campaign');
 };
-$('daily').onclick = async () => {
-  if (paused() || phase === 'running' || phase === 'celebrate') return;
-  if (progress.level <= C.dailyUnlock) { setInstruction('Daily trail unlocks after lake 3.',true); return; }
-  await enter(mode === 'daily' ? 'campaign' : 'daily');
-};
+$('daily').onclick = () => { if (!paused() && phase!=='running' && phase!=='celebrate') { journalTab='today'; openCollection(); } };
 async function reward(action) {
   if (portal.busy) return;
   // Offers are only in paused dialogs or the result screen.
@@ -462,7 +514,7 @@ async function reward(action) {
   if (!success) setInstruction('No ad available. Your stones and coins are safe.',true);
 }
 function reveal() { hintCount = Math.min(level.solution.length, hintCount + 1); setInstruction('A faint ring marks one solution stone. Match its delay if shown.',true); }
-function doubleStars() { const key = rewardKey(); if (!result || progress.doubled[key]) return; const before=totalStars(progress); progress.doubled[key] = true; progress.bonus += result.stars; result.gained += result.stars; result.themesUnlocked=[...new Set([...(result.themesUnlocked||[]),...C.themes.filter(t=>t.unlock>before&&t.unlock<=totalStars(progress)).map(t=>t.name)])]; }
+function doubleStars() { const key = rewardKey(); if (!result || progress.doubled[key]) return; progress.doubled[key] = true; progress.bonus += result.stars; result.gained += result.stars; result.discoveries=readyDiscoveries(progress); }
 function reroll() { progress.goals.rerolled = true; save(); refresh(); }
 $('hint').onclick = () => { if (phase !== 'ready' || adPaused || loading) return; $('help-dialog').close(); $('hint-dialog').showModal(); revealPanel($('hint-dialog')); syncPause(); refresh(); };
 $('hint-close').onclick = () => $('hint-dialog').close();
@@ -512,46 +564,38 @@ $('copy').onclick = async () => {
 };
 function openCollection() {
   if (phase === 'running' || phase === 'celebrate' || adPaused || loading) return;
-  const target = $('theme-options'); target.replaceChildren();
-  C.themes.forEach((theme,i) => {
-    const b = document.createElement('button'), swatch = document.createElement('img'), name = document.createElement('span'), kind = document.createElement('span'), story = document.createElement('span'), detail = document.createElement('small');
-    swatch.className = 'theme-swatch'; swatch.style.setProperty('--swatch-color',`rgb(${theme.base.join(',')})`); swatch.alt = ''; swatch.width = 300; swatch.height = 168; swatch.dataset.theme = i;
-    name.textContent = theme.name; kind.className = 'theme-kind'; kind.textContent = theme.landscape;
-    story.className = 'theme-story'; story.textContent = theme.description;
-    b.disabled = totalStars(progress) < theme.unlock; b.setAttribute('aria-pressed',String(i===progress.theme)); b.setAttribute('aria-description',theme.description);
-    detail.append(icon(i===progress.theme?'check':b.disabled?'lock':'sun'),document.createTextNode(i===progress.theme?'Selected':b.disabled?`${theme.unlock} stars`:'Available'));
-    b.append(swatch,name,kind,story,detail); b.onclick = () => { progress.theme = i; applyTheme(); save(); openCollection(); $('theme-options').children[i].focus({preventScroll:true}); }; target.append(b);
-  });
   renderLakeList();
   renderDiscoveries();
-  action('continue-journey',`Play lake ${String(progress.level).padStart(2,'0')}`,'arrow-right');
-  if (!$('collection-dialog').open) { showJournalTab(journalTab); $('collection-dialog').showModal(); revealPanel($('collection-dialog')); } syncPause(); refresh(); paintThemePreviews();
+  renderShop();
+  applyTheme();
+  action('continue-journey',`Play level ${String(progress.level).padStart(2,'0')}`,'arrow-right');
+  if (!$('collection-dialog').open) { showJournalTab(journalTab); $('collection-dialog').showModal(); revealPanel($('collection-dialog')); } syncPause(); refresh();
 
 }
 function renderLakeList() {
-  const first = collectionPage * C.chapterLength + 1;
-  const ch = chapterProgress(progress,first);
-  $('lake-page').textContent = `Chapter ${ch.index+1} · ${ch.name}`;
-  $('mastery-progress').textContent = `${ch.stars}/${C.chapterLength*3} stars${ch.mastered?' · Mastered':''}`;
-  const target=masteryTarget(progress,first);
+  const first = collectionPage * C.lakeLength + 1, lake=lakeForLevel(first);
+  const scores=Array.from({length:C.lakeLength},(_,i)=>Number(progress.stars[`l${first+i}`])||0);
+  $('lake-page').textContent = lake.name;
+  $('mastery-progress').textContent = `LEVELS ${String(lake.first).padStart(2,'0')}–${String(lake.last).padStart(2,'0')} · ${scores.reduce((a,b)=>a+b,0)}/${C.lakeLength*3} stars`;
+  const target=[masteryTarget(progress,first),masteryTarget(progress,first+C.chapterLength)].filter(Boolean).sort((a,b)=>b.stars-a.stars||a.number-b.number)[0];
   $('mastery-replay').hidden=!target;
-  if(target){action('mastery-replay',`Improve lake ${target.number} · ${target.stars}/3 stars`,'arrow-right');$('mastery-replay').onclick=()=>revisitLake(target.number);}
-  $('page-back').disabled = collectionPage === 0; $('page-next').disabled = first + C.chapterLength > progress.level + 1;
-  $('lake-list').replaceChildren(...Array.from({length:C.chapterLength}, (_,i) => {
+  if(target){action('mastery-replay',`Improve level ${target.number} · ${target.stars}/3 stars`,'arrow-right');$('mastery-replay').onclick=()=>revisitLake(target.number);}
+  $('page-back').disabled = collectionPage === 0; $('page-next').disabled = first+C.lakeLength>=Math.max(C.featuredLevels,progress.level+1);
+  $('lake-list').replaceChildren(...Array.from({length:C.lakeLength}, (_,i) => {
     const number = first + i, b = document.createElement('button'), mark = document.createElement('small');
     const available = number <= progress.level, next = number === progress.level + 1 && progress.level > 1;
     b.disabled = !available && (!next || progress.tokens < C.lakeSkipCost);
     b.classList.toggle('lake-for-sale',next);
     const numberLabel=document.createElement('span'),name=document.createElement('span');numberLabel.className='lake-number';numberLabel.textContent=String(number).padStart(2,'0');
-    name.className='lake-label';name.textContent=SCRIPTED[number-1]?.name || `Lake ${number}`;
+    name.className='lake-label';name.textContent=SCRIPTED[number-1]?.name || levelName(number);
     const stars = progress.stars[`l${number}`] || 0;
     if (!available) {numberLabel.append(icon('lock'));mark.textContent=next ? `${C.lakeSkipCost} coins` : 'Locked';}
     else if (stars) mark.append(...Array.from({length:3},(_,i)=>icon('star',i<stars?'earned':'')));
-    else mark.textContent = number === progress.level ? 'Next lake' : 'Play';
+    else mark.textContent = number === progress.level ? 'Next level' : 'Play';
     mark.setAttribute('aria-hidden','true');
-    b.setAttribute('aria-label',`Lake ${number}, ${name.textContent}, ${next ? progress.tokens >= C.lakeSkipCost ? `unlock for ${C.lakeSkipCost} coins` : `needs ${C.lakeSkipCost} coins` : available ? stars ? `${stars} of 3 stars` : 'ready to play' : 'locked'}`);
+    b.setAttribute('aria-label',`Level ${number}, ${name.textContent}, ${next ? progress.tokens >= C.lakeSkipCost ? `unlock for ${C.lakeSkipCost} coins` : `needs ${C.lakeSkipCost} coins` : available ? stars ? `${stars} of 3 stars` : 'ready to play' : 'locked'}`);
     if (mode === 'campaign' && level?.number === number) b.setAttribute('aria-current','step');
-    const record = progress.records[`l${number}`]; b.title = record ? `Best: ${record.stones} stones, ${record.attempts} drops` : `Lake ${number}`;
+    const record = progress.records[`l${number}`]; b.title = record ? `Best: ${record.stones} stones, ${record.attempts} drops` : `Level ${number}`;
     b.append(numberLabel,name,mark); b.onclick = () => {
       if (next) { if (!buyNextLake(progress,number)) return; save(); }
       revisitLake(number);
@@ -563,30 +607,16 @@ async function revisitLake(number) {
   save();progress.campaign={number};level=null;$('collection-dialog').close();manualPause=false;await enter('campaign');
 }
 $('page-back').onclick = () => { collectionPage = Math.max(0, collectionPage - 1); renderLakeList(); };
-$('page-next').onclick = () => { collectionPage = Math.min(Math.floor(progress.level / C.chapterLength), collectionPage + 1); renderLakeList(); };
-$('collection-top').onclick = () => { collectionPage = chapter(progress.level).index; journalTab = 'lakes'; openCollection(); };
-$('collection-mobile').onclick = () => { collectionPage = chapter(progress.level).index; journalTab = 'lakes'; openCollection(); };
-$('result-journal').onclick = () => { collectionPage = chapter(progress.level).index; journalTab = 'lakes'; openCollection(); };
+$('page-next').onclick = () => { collectionPage = Math.min(Math.ceil(Math.max(C.featuredLevels,progress.level+1)/C.lakeLength)-1, collectionPage + 1); renderLakeList(); };
+$('collection-top').onclick = () => { collectionPage = lakeForLevel(progress.level).group; journalTab = 'lakes'; openCollection(); };
+$('collection-mobile').onclick = () => { collectionPage = lakeForLevel(progress.level).group; journalTab = 'lakes'; openCollection(); };
+$('result-journal').onclick = () => { collectionPage = lakeForLevel(progress.level).group; journalTab = 'lakes'; openCollection(); };
 $('continue-journey').onclick = async () => {
   if (loading || adPaused) return;
   $('collection-dialog').close(); manualPause = false;
   if (mode === 'campaign' && level.number === progress.level && phase !== 'complete') { syncPause(); overlay(); refresh(); return; }
   save(); progress.campaign = {number:progress.level}; level = null; await enter('campaign');
 };
-// Render one real landscape thumbnail per frame, only when the panel is visible.
-// Cached images make subsequent visits instant without retaining six render loops.
-let themePreviewFrame = 0;
-function paintThemePreviews() {
-  cancelAnimationFrame(themePreviewFrame);
-  const next = () => {
-    if (!$('collection-dialog').open || $('panel-mood').hidden) return;
-    const image = $('theme-options').querySelector('img:not([src])');
-    if (!image) return;
-    image.src = renderer.thumbnail(C.themes[Number(image.dataset.theme)]);
-    themePreviewFrame = requestAnimationFrame(next);
-  };
-  themePreviewFrame = requestAnimationFrame(next);
-}
 function showJournalTab(name, focus = false) {
   journalTab = name;
   for (const tab of document.querySelectorAll('[data-panel]')) {
@@ -596,7 +626,8 @@ function showJournalTab(name, focus = false) {
     if (selected && focus) tab.focus();
   }
   $('journal-body').scrollTop = 0;
-  if (name === 'mood') paintThemePreviews();
+  const tabs=$('collection-dialog').querySelector('.journal-tabs');
+  if(tabs.scrollWidth<=tabs.clientWidth+1)tabs.scrollLeft=0;
 }
 const journalTabs = [...document.querySelectorAll('[data-panel]')];
 for (const [index,tab] of journalTabs.entries()) {
@@ -606,7 +637,9 @@ for (const [index,tab] of journalTabs.entries()) {
     if (next !== null) { event.preventDefault(); showJournalTab(journalTabs[next].dataset.panel,true); }
   };
 }
-$('journal-daily').onclick = async () => { if (loading || adPaused || progress.level <= C.dailyUnlock) return; $('collection-dialog').close(); manualPause = false; await enter('daily'); };
+$('journal-daily').onclick = async () => { if (loading || adPaused || (mode!=='daily'&&progress.level<=C.dailyUnlock)) return; $('collection-dialog').close(); manualPause = false; await enter(mode==='daily'?'campaign':'daily'); };
+$('claim-daily').onclick = () => { const gift=claimDailyGift(progress);if(!gift)return;save();refresh();renderDiscoveries();renderShop();showRewardToast(`Day ${gift.streak} reward`,`+${gift.reward} coins`); };
+for(const button of $('theme-options').querySelectorAll('button'))button.onclick=()=>{if(setLakeLight(progress,activeLakeNumber(),button.dataset.light)){applyTheme();save();showRewardToast(button.dataset.light==='day'?'Daylight selected':'Nightfall selected',lakeForLevel(activeLakeNumber()).name);} };
 $('journal-back').onclick = () => $('collection-dialog').close();
 $('close-dialog').onclick = () => $('collection-dialog').close(); $('collection-dialog').addEventListener('close', () => { syncPause(); refresh(); });
 document.addEventListener('visibilitychange', () => { hidden = document.hidden; syncPause(true); save(); }); window.addEventListener('pagehide',save);
@@ -644,7 +677,18 @@ portal.init().then(async () => {
   if (portal.sdk?.data) {
     const cloud = portal.initialData;
     if (cloud && !touched) { progress = parseProgress(cloud); mode = progress.mode; level = null; await enter(); }
-    else if (cloud) { const remote = parseProgress(cloud); for (const [key,value] of Object.entries(remote.stars)) progress.stars[key] = Math.max(progress.stars[key] || 0, value); progress.level = Math.max(progress.level,remote.level); progress.bonus = Math.max(progress.bonus,remote.bonus); progress.doubled = {...remote.doubled,...progress.doubled}; progress.dailyResults = {...remote.dailyResults,...progress.dailyResults}; progress.chapters = {...remote.chapters,...progress.chapters}; progress.mastery = {...remote.mastery,...progress.mastery}; progress.discoveries = {...remote.discoveries,...progress.discoveries}; progress.records = {...remote.records,...progress.records}; progress.tokens = Math.max(progress.tokens,remote.tokens); if (remote.lastDaily > progress.lastDaily) { progress.lastDaily = remote.lastDaily; progress.streak = remote.streak; } }
+    else if (cloud) {
+      const remote = parseProgress(cloud);
+      for (const [key,value] of Object.entries(remote.stars)) progress.stars[key] = Math.max(progress.stars[key] || 0, value);
+      progress.level = Math.max(progress.level,remote.level); progress.bonus = Math.max(progress.bonus,remote.bonus);
+      for(const key of ['doubled','dailyResults','chapters','mastery','lakeRewards','discoveries','records'])progress[key]={...remote[key],...progress[key]};
+      progress.lakeLights={...remote.lakeLights,...progress.lakeLights};
+      for(const kind of ['stones','lanterns'])progress.cosmetics[kind]=[...new Set([...remote.cosmetics[kind],...progress.cosmetics[kind]])];
+      progress.tokens=Math.max(progress.tokens,remote.tokens);
+      if(remote.dailyGift.lastDay>progress.dailyGift.lastDay)progress.dailyGift=remote.dailyGift;
+      if (remote.lastDaily > progress.lastDaily) { progress.lastDaily = remote.lastDaily; progress.streak = remote.streak; }
+      applyTheme();
+    }
     portal.acceptData(); save();
   }
   portal.context({ level:level.number, mode }); syncPause(); refresh();

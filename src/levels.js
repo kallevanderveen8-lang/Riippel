@@ -2,6 +2,18 @@ import { C } from './config.js';
 import { Wave, mulberry32, validPoint, distance2, cell } from './simulation.js';
 
 const names = ['A small beginning', 'Between two lights', 'Better together', 'A quiet conversation', 'Three little suns', 'In harmony', 'Around the bend', 'An echo returns', 'A gathering of light', 'The whole pond'];
+const lakeNames = [
+  names,
+  ['The reed line','A warmer shore','Hidden shallows','Where light lingers','A gentle crossing','Under the willows','The long reflection','Last light on water','A quiet return','Beyond the reeds'],
+  ['First raindrop','A darker green','Beneath the canopy','Two silver paths','The mossy bend','After the thunder','Among wet stones','A small clearing','The fern pool','When rain ends'],
+  ['A silver beginning','The moon path','Nightfall echoes','Across the cove','Three pale lights','A lantern in blue','The far reflection','Between shadows','The still hour','Before the dawn'],
+  ['Copper leaves','The amber bank','A wandering current','Between the branches','A golden pause','Across the olive water','The last leaf','Warm stone echoes','A quiet harvest','Beyond the autumn shore'],
+  ['Into clear water','The granite edge','A high reflection','Among the stones','Mountain light','The turquoise bend','A wider sky','Across the basin','The pale horizon','Where peaks meet']
+];
+export function levelName(number) {
+  const group=Math.floor((number-1)/C.lakeLength),slot=(number-1)%C.lakeLength;
+  return lakeNames[group%lakeNames.length][slot];
+}
 export function difficulty(number) {
   return { par: number < 3 ? 1 : number < 5 ? 2 : number < 10 ? 3 : number < 20 ? 4 : 5,
     count: number === 1 || number === 3 ? 1 : number < 5 ? 2 : number < 10 ? 3 : number < 20 ? 4 : number < 30 ? 5 : 6,
@@ -67,7 +79,7 @@ export function generate(number, seed = number * 7919, daily = false) {
     // Delays are optional initially; every fifth late pond uses a real delayed drop.
     if (d.delays && number % 5 === 0) solution[solution.length - 1].delay = 1;
     const result = candidatesFor(wave, solution, rocks, d.count, rng);
-    if (result.lanterns.length === d.count) return { number, seed, name: daily ? 'One pond. Everyone.' : names[number - 1] || (d.delays ? 'A moment in time' : 'Where echoes meet'), par: d.par, limit: d.par + 2, rocks, solution, ...result, clearance: C.lanternClearance, generationMs: performance.now() - start, retries: attempt };
+    if (result.lanterns.length === d.count) return { number, seed, name: daily ? 'One pond. Everyone.' : levelName(number), par: d.par, limit: d.par + 2, rocks, solution, ...result, clearance: C.lanternClearance, generationMs: performance.now() - start, retries: attempt };
   }
   // Never ship an unverified or softened-margin fallback. The next deterministic
   // seed keeps searching with the same difficulty and original daily identity.

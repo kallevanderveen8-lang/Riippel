@@ -2,8 +2,8 @@
   "launchStage": "full",
   "files": 26,
   "bundledImages": 14,
-  "uncompressedBytes": 6895600,
-  "zipBytes": 6760027,
+  "uncompressedBytes": 6915532,
+  "zipBytes": 6766008,
   "externalAssets": 0,
   "optionalNetworkDependency": "official CrazyGames v3 SDK only",
   "firstLoadMeasured": false

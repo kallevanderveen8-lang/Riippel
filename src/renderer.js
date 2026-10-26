@@ -48,6 +48,7 @@ function stoneTexture(seed, size, color) {
 const rockCache = new Map();
 const artURL = path => globalThis.__RIPPLE_ASSETS__?.[path] || path;
 const lakeImages = new Map();
+const photoMasks = new Map();
 function lakeImage(theme) {
   if (!lakeImages.has(theme.art)) {
     const image = new Image();
@@ -57,6 +58,19 @@ function lakeImage(theme) {
   }
   const image = lakeImages.get(theme.art);
   return image.complete && image.naturalWidth ? image : null;
+}
+function photoMask(theme,image) {
+  if(photoMasks.has(theme.art))return photoMasks.get(theme.art);
+  const width=512,height=288,canvas=surface(width,height),ctx=canvas.getContext('2d');
+  ctx.drawImage(image,0,0,width,height);
+  const pixels=ctx.getImageData(0,0,width,height).data,alpha=new Uint8Array(width*height);
+  for(let i=0;i<alpha.length;i++){
+    const r=pixels[i*4],g=pixels[i*4+1],b=pixels[i*4+2];
+    // Mineral-grey rock and warm leaves stay still; blue/green water carries
+    // the animated light. The soft threshold preserves pale shallows.
+    alpha[i]=Math.round(clamp(Math.max(g-r*1.02,b-r*1.07)/22)*255);
+  }
+  const mask={width,height,alpha};photoMasks.set(theme.art,mask);return mask;
 }
 const atlas = new Image();
 let artVersion = 0;
@@ -80,6 +94,7 @@ export class Renderer {
     this.canvas = canvas; this.ctx = canvas.getContext('2d');
     this.off = surface(1); this.octx = this.off.getContext('2d');
     this.theme = theme; this.preview = preview; this.bursts = []; this.zoom = 0; this.cachedTheme = null; this.thumbnails = new Map();
+    this.timeOfDay='day';this.cosmetics={stone:'river',lantern:'bronze'};this.cosmeticCache=new Map();
     const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
     this.motionPreference = motionPreference; this.userReduced = false;
     this.reduced = preview || motionPreference.matches;
@@ -135,9 +150,37 @@ export class Renderer {
   }
   pan(dx, dy) { if (this.preview) return; this.view.x += dx; this.view.y += dy; this.clampCamera(); }
   stonePreview(index) {
-    const rocks = rocksFor(this.theme), stone = rocks[(index + 5) % rocks.length];
+    const stone = this.stoneFor(index);
     if (!stone.previewURL) stone.previewURL = stone.toDataURL();
     return stone.previewURL;
+  }
+  stoneFor(index=0,id=this.cosmetics.stone) {
+    const base=rocksFor(this.theme)[(index+5)%C.render.stoneVariants];
+    if(id==='river')return base;
+    const key=`${this.theme.name}:${index}:${id}:${artVersion}`;
+    if(this.cosmeticCache.has(key))return this.cosmeticCache.get(key);
+    const c=surface(512),ctx=c.getContext('2d');ctx.drawImage(base,0,0);
+    const tints={slate:'#53677b',amber:'#c99650',sleepy:'#9d9bba',frog:'#6d9b5a',potato:'#b69a6a'};
+    ctx.globalCompositeOperation='source-atop';ctx.fillStyle=tints[id]+'7a';ctx.fillRect(0,0,512,512);ctx.globalCompositeOperation='source-over';
+    if(['sleepy','frog','potato'].includes(id)) {
+      ctx.lineCap='round';ctx.lineWidth=13;ctx.strokeStyle='#243734';ctx.fillStyle='#243734';
+      if(id==='sleepy') {
+        for(const x of [190,318]){ctx.beginPath();ctx.arc(x,244,29,.12,Math.PI-.12);ctx.stroke();}
+        ctx.beginPath();ctx.arc(255,308,16,0,Math.PI*2);ctx.fill();
+      } else {
+        for(const x of [191,319]) {ctx.beginPath();ctx.ellipse(x,246,12,19,0,0,Math.PI*2);ctx.fill();}
+        ctx.beginPath();ctx.arc(255,276,70,.25,Math.PI-.25);ctx.stroke();
+        if(id==='frog'){ctx.fillStyle='#e3d6ad';for(const x of [191,319]){ctx.beginPath();ctx.arc(x,246,4,0,Math.PI*2);ctx.fill();}}
+      }
+    }
+    this.cosmeticCache.set(key,c);return c;
+  }
+  cosmeticPreview(kind,id) {
+    if(kind==='stones')return this.stoneFor(0,id).toDataURL();
+    const c=surface(160),ctx=c.getContext('2d');ctx.translate(80,80);ctx.scale(23,23);
+    const previous=this.cosmetics;this.cosmetics={...previous,lantern:id};
+    this.lantern(ctx,{x:0,y:0},true,0,0,{stepNumber:0});this.cosmetics=previous;
+    return c.toDataURL();
   }
   get artVersion() { return artVersion; }
   point(clientX, clientY) {
@@ -235,14 +278,14 @@ export class Renderer {
     }
   }
   burst(x, y, time) { this.bursts.push({ x, y, time }); }
-  photoWater(wave, time) {
+  photoWater(wave, time, level, running,photo) {
     const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h;
     const normalX = this.normalX, normalY = this.normalY;
     for (let y = 1; y < 127; y++) for (let x = 1; x < 127; x++) {
       const p = y * 128 + x;
-      normalX[p] = field[p + 1] - field[p - 1]; normalY[p] = field[p + 128] - field[p - 128];
+      normalX[p] = running ? field[p + 1] - field[p - 1] : 0; normalY[p] = running ? field[p + 128] - field[p - 128] : 0;
     }
-    const v = this.view;
+    const v = this.view,mask=photoMask(this.theme,photo);
     for (let y = 0; y < h; y++) {
       const gy = (y / h * this.height - v.y) / v.height * 128, iy = Math.floor(gy), fy = gy - iy;
       for (let x = 0; x < w; x++) {
@@ -254,13 +297,19 @@ export class Renderer {
           ny = mix(mix(normalY[c], normalY[c + 1], fx), mix(normalY[c + 128], normalY[c + 129], fx), fy);
         }
         const light = nx * .7 + ny * .9;
-        const shimmer = this.reduced ? 0 : Math.max(0, this.sines[(x * 14 + y * 21 + time * 28) & 2047] * this.sines[(x * 23 - y * 9 - time * 21) & 2047]) * .004;
+        const shimmer = this.reduced ? 0 : Math.max(0,this.sines[(x*11+y*5-time*350)&2047]*this.sines[(y*13-x*4+time*220)&2047])*.018;
+        // The physical wave solver reflects from rocks; the light pass must
+        // respect the same silhouette so a highlight cannot cross dry stone.
+        const dry=level.rocks.some(r=>((gx-r.x)/(r.rx*1.05))**2+((gy-r.y)/(r.ry*1.05))**2<1);
+        const mx=Math.max(0,Math.min(mask.width-1,Math.round(gx/128*mask.width)));
+        const my=Math.max(0,Math.min(mask.height-1,Math.round(gy/128*mask.height)));
+        const waterAlpha=dry?0:mask.alpha[my*mask.width+mx]/255;
         if (light >= 0) {
           data[p] = 223; data[p + 1] = 245; data[p + 2] = 238;
-          data[p + 3] = clamp(light * 3.2 + shimmer, 0, .19) * 255;
+          data[p + 3] = waterAlpha*clamp(light * 4.2 + shimmer, 0, .23) * 255;
         } else {
           data[p] = 4; data[p + 1] = 39; data[p + 2] = 47;
-          data[p + 3] = clamp(-light * 2, 0, .12) * 255;
+          data[p + 3] = waterAlpha*clamp(-light * 2.7, 0, .16) * 255;
         }
       }
     }
@@ -312,15 +361,15 @@ export class Renderer {
   draw(wave, level, stones, lit, time, running, hints = [], hover = null) {
     if (this.cachedTheme !== this.theme || this.rocksVersion !== artVersion) { this.buildScene(); this.rocksVersion = artVersion; }
     const photo = lakeImage(this.theme);
-    const activeRipples = photo && running && wave.stepNumber > 0;
-    if (activeRipples) this.photoWater(wave, time);
+    const activeRipples = !!photo;
+    if (activeRipples) this.photoWater(wave, time,level,running&&wave.stepNumber>0,photo);
     else if (!photo) this.water(wave, time);
     const ctx = this.ctx, W = this.width, H = this.height, v = this.view, scale = v.size / C.size;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const art = photo ? artURL(this.theme.art) : '';
+    const art = photo ? `${artURL(this.theme.art)}:${this.timeOfDay}` : '';
     if (this.displayedArt !== art) {
-      this.canvas.style.backgroundImage = art ? `linear-gradient(to bottom, transparent 65%, #15263248), url("${art}")` : '';
+      this.canvas.style.backgroundImage = art ? `${this.timeOfDay==='night'?'linear-gradient(#0419278c,#072139a3)':'linear-gradient(to bottom, transparent 65%, #15263248)'}, url("${artURL(this.theme.art)}")` : '';
       this.displayedArt = art;
     }
     this.canvas.style.backgroundSize = `100% 100%, ${v.width}px ${v.height}px`;
@@ -330,10 +379,14 @@ export class Renderer {
     if (this.zoom && !this.reduced) { const z = 1 + this.zoom * .014; ctx.translate(v.x + v.width / 2, v.y + v.height / 2); ctx.scale(z, z); ctx.translate(-v.x - v.width / 2, -v.y - v.height / 2); }
     ctx.translate(v.x, v.y); ctx.scale(v.width / C.size, v.height / C.size);
     if (!running && level.clearance) for (const l of level.lanterns) {
-      ctx.beginPath(); ctx.arc(l.x, l.y, level.clearance, 0, Math.PI * 2); ctx.strokeStyle = '#dfd9ba38'; ctx.lineWidth = .16; ctx.setLineDash([.6, 1.8]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(l.x,l.y,level.clearance,0,Math.PI*2);ctx.setLineDash([.75,1.1]);
+      ctx.strokeStyle='#092a35a8';ctx.lineWidth=.48;ctx.stroke();
+      ctx.strokeStyle='#fff9dfdc';ctx.lineWidth=.22;ctx.stroke();ctx.setLineDash([]);
     }
     for (let i = 0; i < level.rocks.length; i++) {
       const r = level.rocks[i];
+      ctx.save();ctx.translate(r.x,r.y);ctx.fillStyle='#061e2485';ctx.beginPath();ctx.ellipse(.35,.65,r.rx*1.04,r.ry*1.05,-.08,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=this.timeOfDay==='night'?'#a3c5ce58':'#dcf1e772';ctx.lineWidth=.13;ctx.setLineDash([.65,1.3]);ctx.beginPath();ctx.ellipse(0,.12,r.rx*1.065,r.ry*1.07,-.08,.15,Math.PI-.12);ctx.stroke();ctx.setLineDash([]);ctx.restore();
       ctx.save(); ctx.translate(r.x, r.y);
       ctx.shadowColor = '#091d1bb0'; ctx.shadowBlur = 5 * this.dpr; ctx.shadowOffsetX = 1.5 * this.dpr; ctx.shadowOffsetY = 3 * this.dpr;
       ctx.drawImage(boulder.complete && boulder.naturalWidth ? boulder : this.rocks[(i + 2) % this.rocks.length], -r.rx * 1.16, -r.ry * 1.16, r.rx * 2.32, r.ry * 2.32); ctx.restore();
@@ -349,7 +402,8 @@ export class Renderer {
       ctx.save(); ctx.translate(stone.x, stone.y); ctx.scale(v.size / v.width, v.size / v.height);
       if (sinking) ctx.globalAlpha = clamp(1 - age * 3.5, 0, 1);
       ctx.fillStyle = '#12232c77'; ctx.beginPath(); ctx.ellipse(.5, .8, radius * .9, radius * .65, -.3, 0, Math.PI * 2); ctx.fill();
-      ctx.rotate(-.4 + i * 1.2); ctx.drawImage(this.rocks[(i + 5) % this.rocks.length], -radius, -radius, radius * 2, radius * 2); ctx.restore();
+      ctx.strokeStyle='#e9f7e795';ctx.lineWidth=.18;ctx.beginPath();ctx.ellipse(0,0,radius*1.08,radius*.83,-.2,0,Math.PI*2);ctx.stroke();
+      ctx.rotate(-.4 + i * 1.2); ctx.drawImage(this.stoneFor(i), -radius, -radius, radius * 2, radius * 2); ctx.restore();
       if (sinking && age < .38 && !this.reduced) {
         ctx.save(); ctx.translate(stone.x, stone.y); ctx.scale(v.size / v.width, v.size / v.height); ctx.strokeStyle = `rgba(225,237,238,${(1 - age / .38) * .6})`; ctx.lineWidth = .18;
         ctx.beginPath(); ctx.arc(0, 0, .6 + age * 9, 0, Math.PI * 2); ctx.stroke();
@@ -394,7 +448,8 @@ export class Renderer {
       for (let r = 0; r < 12; r++) { const dy = 2.5 + r * .55, wobble = Math.sin(time * 1.8 + r * 1.3) * .6; ctx.strokeStyle = `rgba(235,192,117,${(.22 - r * .016)})`; ctx.lineWidth = .27; ctx.beginPath(); ctx.moveTo(-1.3 + wobble, dy); ctx.lineTo(1.3 + wobble, dy); ctx.stroke(); }
     }
     ctx.fillStyle = '#14222c88'; ctx.beginPath(); ctx.ellipse(.3, .65, 2.75, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-    const wood = ctx.createLinearGradient(-2, -2, 2, 2); wood.addColorStop(0, '#b39b70'); wood.addColorStop(.45, '#685845'); wood.addColorStop(1, '#3e3830');
+    const finish={bronze:['#b39b70','#685845','#3e3830'],reed:['#a3a575','#58674b','#303f34'],silver:['#d8e0db','#839399','#485c69'],firefly:['#cbb879','#806f46','#3b4032']}[this.cosmetics.lantern]||['#b39b70','#685845','#3e3830'];
+    const wood = ctx.createLinearGradient(-2, -2, 2, 2); wood.addColorStop(0, finish[0]); wood.addColorStop(.45,finish[1]); wood.addColorStop(1,finish[2]);
     ctx.fillStyle = wood; ctx.beginPath(); ctx.ellipse(0, 0, 2.5, 2.35, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#c1aa7d77'; ctx.lineWidth = .13; ctx.beginPath(); ctx.ellipse(0, -.1, 2.17, 1.99, 0, 0, Math.PI * 2); ctx.stroke();
     const glass = ctx.createRadialGradient(-.45, -.65, .1, 0, 0, 1.8);

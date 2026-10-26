@@ -10,8 +10,24 @@ export const C = Object.freeze({
   themeStars: 10, hintFailures: 2, rewardedFailures: 3, masteryTokens: 2, guidedHelpFailures: 6,
   firstAdSeconds: 180, adIntervalSeconds: 180, adEveryLevels: 5,
   adTimeoutMs: 90000, sdkTimeoutMs: 2500, saveKey: 'ripple-pond-v1',
-  winSeconds: 1.8, visualTailSteps: 720, chapterLength: 5, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, recordLimit: 300, maxTokens: 99, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
+  winSeconds: 1.8, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], recordLimit: 300, maxTokens: 999, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, lakeSkipCost: 3, solverBudget: 24, benchmarkCount: 300,
+  cosmetics: {
+    stones: [
+      { id:'river', name:'River stone', cost:0, kind:'Natural' },
+      { id:'slate', name:'Slate stone', cost:5, kind:'Natural' },
+      { id:'amber', name:'Amber stone', cost:8, kind:'Natural' },
+      { id:'sleepy', name:'Sleepy pebble', cost:12, kind:'Playful' },
+      { id:'frog', name:'Frog stone', cost:15, kind:'Playful' },
+      { id:'potato', name:'Tiny potato', cost:18, kind:'Playful' }
+    ],
+    lanterns: [
+      { id:'bronze', name:'Bronze lantern', cost:0, kind:'Classic' },
+      { id:'reed', name:'Reed lantern', cost:6, kind:'Natural' },
+      { id:'silver', name:'Silver lantern', cost:9, kind:'Cool' },
+      { id:'firefly', name:'Firefly lantern', cost:14, kind:'Warm' }
+    ]
+  },
   themes: [
     { name: 'Morning lake', art: 'assets/morning-lake.webp', landscape: 'Woodland lake', description: 'Jade water, mossy stones and fern-lined banks.', base: [7, 42, 54], light: [50, 94, 93], accent: '#b7cbb5', stone: '#96998a', notes: [130.81, 196, 261.63], unlock: 0,
       scene: { seed: 72419, banks: [.76, .2], bed: '#817f62', plants: 'fern', foliage: ['#354e36','#55704b','#819065'], clarity: .76, canopy: .85, shore: 1 } },
@@ -29,3 +45,9 @@ export const C = Object.freeze({
   audio: { master: 0.24, ambient: 0.025, chime: 0.18, splash: 0.10, waterLoopSeconds: 4, waterLowpass: 650, waterBed: 0.055 },
   render: { dpr: 2, waterResolution: 560, normalGain: 280, stoneVariants: 9, stoneTexture: 128, gravelCount: 1600, placedStoneRadius: 2.6, stoneMinPixels: 20, lanternMinPixels: 24 },
 });
+export function lakeForLevel(number) {
+  const group = Math.floor((Math.max(1,number)-1)/C.lakeLength);
+  const themeIndex = group % C.themes.length;
+  const visit = Math.floor(group/C.themes.length)+1;
+  return { group, first:group*C.lakeLength+1, last:(group+1)*C.lakeLength, themeIndex, visit, theme:C.themes[themeIndex], name:C.themes[themeIndex].name+(visit>1?` · Return ${visit}`:'') };
+}

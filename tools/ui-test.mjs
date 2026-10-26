@@ -94,14 +94,14 @@ try {
   for(let i=0;i<8;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.getElementById('overlay').contains(document.activeElement)),true);}
   await page.click('#double-token');assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),tokensBeforeBonus-2);
   assert.equal(await page.locator('#bonus-options').isVisible(),false);
-  assert.match(await page.locator('#result-discovery').innerText(),/New landscape · Evening light/);
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.doubled.l1),true);
   await page.reload();await page.waitForFunction(()=>window.__ripple?.state.phase==='complete');
   assert.equal(await page.locator('#bonus-options').isVisible(),false);
-  checks.push('Bonus disclosure stays keyboard accessible, pays once after reload and explains newly unlocked landscapes');
+  checks.push('Bonus disclosure stays keyboard accessible and pays once after reload');
   await page.click('#result-journal');assert.equal(await page.locator('#collection-dialog').getAttribute('aria-labelledby'),'journal-title');
   await page.locator('#tab-lakes').focus();await page.keyboard.press('ArrowRight');assert.equal(await page.locator('#jump-goals').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#panel-today').isVisible(),true);assert.equal(await page.locator('#panel-lakes').isVisible(),false);
-  await page.keyboard.press('End');assert.equal(await page.locator('#tab-mood').getAttribute('aria-selected'),'true');
+  await page.keyboard.press('End');assert.equal(await page.locator('#tab-shop').getAttribute('aria-selected'),'true');
   await page.keyboard.press('Home');assert.equal(await page.locator('#tab-lakes').getAttribute('aria-selected'),'true');
   await page.keyboard.press('Escape');assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),false);
   assert.equal(await page.evaluate(()=>document.activeElement.id),'result-journal');checks.push('Journal tabs support arrow/Home/End keys; native dismissal restores focus');
@@ -120,7 +120,7 @@ try {
   await page.click('#how-to');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);await shot('controls-help');
   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);assert.equal(await page.evaluate(()=>document.activeElement.id),'how-to');
   await page.evaluate(()=>{window.__ripple.state.progress.level=6;window.__ripple.state.progress.stars.l1=2;});
-  await openJournal();await page.click('#tab-lakes');await page.click('#page-back');await page.click('#mastery-replay');
+  await openJournal();await page.click('#tab-lakes');await page.click('#mastery-replay');
   await page.waitForFunction(()=>window.__ripple.state.level.number===1&&!window.__ripple.state.paused);
   await openJournal();await page.click('#continue-journey');await page.waitForFunction(()=>window.__ripple.state.level.number===6&&!window.__ripple.state.paused);
   checks.push('Right-click removes stones; instructions pause and restore focus; mastery replay returns to the unlocked journey');
@@ -133,7 +133,7 @@ try {
     });assert.equal(crowded,false,`Floating controls overlap at ${size.join('×')}`);
     await shot(`minimal-hud-${size[0]}`);
     await openJournal();
-    for(const tab of ['tab-lakes','jump-goals','jump-keepsakes','tab-mood']) {
+    for(const tab of ['tab-lakes','jump-goals','jump-keepsakes','tab-mood','tab-shop']) {
       await page.click(`#${tab}`);
       const layout=await page.locator('#collection-dialog').evaluate(d=>{
         const close=document.getElementById('close-dialog').getBoundingClientRect(),back=document.getElementById('journal-back').getBoundingClientRect();
@@ -144,7 +144,7 @@ try {
     }
     await closeJournal();
   }
-  checks.push('All four journal panels fit compact through Full HD desktop with reachable close/back and 44px+ targets');
+  checks.push('All five Collection panels fit compact through Full HD desktop with reachable close/back and 44px+ targets');
   await page.click('#help-open');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);
   assert.match(await page.locator('#help-scoring').innerText(),/three stars/);
   await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement.id),'help-open');
@@ -199,25 +199,34 @@ try {
   await page.evaluate(()=>document.documentElement.style.fontSize='');
   await page.setViewportSize({width:1216,height:684});
   assert.equal(await page.locator('.brand,.brand-mark').count(),0);
+  await page.evaluate(()=>{window.__ripple.state.progress.level=15;window.__ripple.save();});
   await openJournal();await page.click('#tab-mood');
-  assert.equal(await page.locator('#theme-options button').last().isDisabled(),true);
-  await page.waitForFunction(()=>[...document.querySelectorAll('#theme-options img')].every(i=>i.complete&&i.naturalWidth===300));
-  const thumbnails=await page.locator('#theme-options img').evaluateAll(images=>images.map(i=>i.src));
-  assert.equal(new Set(thumbnails).size,6);
+  assert.equal(await page.locator('#theme-options button').count(),2);
+  await page.click('#theme-options [data-light="night"]');
+  assert.equal(await page.locator('#theme-options [data-light="night"]').getAttribute('aria-pressed'),'true');
   await closeJournal();
   const layoutBefore=await page.evaluate(()=>JSON.stringify({level:window.__ripple.state.level,stones:window.__ripple.state.stones}));
-  await page.evaluate(()=>window.__ripple.state.progress.bonus=200);
-  for(let i=0;i<6;i++) {
-    await openJournal();await page.click('#tab-mood');
-    await page.locator('#theme-options button').nth(i).click();
-    assert.equal(await page.locator('#theme-options button').nth(i).getAttribute('aria-pressed'),'true');
-    await closeJournal();
-    assert.equal(await page.evaluate(()=>JSON.stringify({level:window.__ripple.state.level,stones:window.__ripple.state.stones})),layoutBefore);
-    await page.waitForTimeout(80);await shot(`landscape-${i}`);
-  }
+  await page.evaluate(()=>{window.__ripple.state.progress.tokens=40;window.__ripple.refresh();});
+  await openJournal();await page.click('#tab-shop');
+  await page.click('[data-item="frog"] button');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.cosmetics.stone),'frog');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),25);
+  await page.click('[data-item="reed"] button');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.cosmetics.lantern),'reed');
+  await shot('shop');await closeJournal();
+  assert.equal(await page.evaluate(()=>JSON.stringify({level:window.__ripple.state.level,stones:window.__ripple.state.stones})),layoutBefore);
   await page.reload();await page.waitForFunction(()=>window.__ripple?.state.level);
-  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.theme),5);
-  checks.push('Six real landscape previews are distinct; locked rewards stay locked; switching and reloading preserves the puzzle and selected landscape');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.lakeLights[1]),'night');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.cosmetics.stone),'frog');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.cosmetics.lantern),'reed');
+  checks.push('Per-lake night choice and purchased cosmetics survive reload without changing the puzzle');
+  const giftBalance=await page.evaluate(()=>window.__ripple.state.progress.tokens);
+  await openJournal();await page.click('#jump-goals');await page.click('#claim-daily');
+  assert.equal(await page.locator('#reward-toast').isVisible(),true);
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),giftBalance+2);
+  await closeJournal();await page.reload();await page.waitForFunction(()=>window.__ripple?.state.level);
+  await openJournal();await page.click('#jump-goals');assert.equal(await page.locator('#claim-daily').isDisabled(),true);await closeJournal();
+  checks.push('Daily visit reward animates, credits once, and remains claimed after reload');
   assert.deepEqual(errors,[]);
   writeFileSync('reports/ui.json',JSON.stringify({passed:true,checks,contrastRows,errors},null,2)+'\n');console.log(checks);
 } catch(error) {

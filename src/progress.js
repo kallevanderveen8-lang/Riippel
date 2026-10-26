@@ -1,6 +1,6 @@
-import { C } from './config.js';
+import { C, lakeForLevel } from './config.js';
 import { daySeed } from './simulation.js';
-export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, mastery: {}, discoveries: {}, records: {}, tokens: C.initialTokens, theme: 0, muted: false, tutorialDone: false, preferences: { ambientSound: true, reducedMotion: false, highContrast: false, dockTop: false }, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
+export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, mastery: {}, lakeRewards: {}, discoveries: {}, records: {}, tokens: C.initialTokens, theme: 0, lakeLights: {}, cosmetics: {stones:['river'],lanterns:['bronze'],stone:'river',lantern:'bronze'}, dailyGift:{lastDay:0,streak:0,total:0}, muted: false, tutorialDone: false, preferences: { ambientSound: true, reducedMotion: false, highContrast: false, dockTop: false }, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
 export function parseProgress(raw) {
   try {
     const p = JSON.parse(raw); if (!p || p.version !== C.version) return freshProgress();
@@ -11,7 +11,19 @@ export function parseProgress(raw) {
     out.tutorialDone = Object.hasOwn(p, 'tutorialDone') ? !!p.tutorialDone : out.level > 1 || !!p.stars?.l1 || !!p.campaign;
     out.preferences = { ambientSound: p.preferences?.ambientSound !== false, reducedMotion: !!p.preferences?.reducedMotion, highContrast: !!p.preferences?.highContrast, dockTop: !!p.preferences?.dockTop };
     out.bonus = Math.max(0, Number(out.bonus) || 0); out.tokens = Math.max(0, Math.min(C.maxTokens, Math.floor(Number(out.tokens) || 0)));
-    for (const key of ['stars','doubled','dailyResults','chapters','mastery','discoveries','records']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
+    for (const key of ['stars','doubled','dailyResults','chapters','mastery','lakeRewards','discoveries','records']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
+    // Old saves earned landscape choices by stars. Keep their progress, but the
+    // location now follows the level; only lighting and owned cosmetics are chosen.
+    out.lakeLights = Object.fromEntries(Object.entries(p.lakeLights || {}).filter(([key,value])=>/^\d{1,4}$/.test(key)&&(value==='day'||value==='night')));
+    if (!p.lakeLights && p.theme === 3) out.lakeLights[0] = 'night';
+    const owned = (kind,defaultId) => [...new Set([defaultId,...(Array.isArray(p.cosmetics?.[kind])?p.cosmetics[kind]:[]).filter(id=>C.cosmetics[kind].some(item=>item.id===id))])];
+    const stones = owned('stones','river'), lanterns = owned('lanterns','bronze');
+    out.cosmetics = {stones,lanterns,stone:stones.includes(p.cosmetics?.stone)?p.cosmetics.stone:'river',lantern:lanterns.includes(p.cosmetics?.lantern)?p.cosmetics.lantern:'bronze'};
+    out.dailyGift = {lastDay:Math.max(0,Math.floor(Number(p.dailyGift?.lastDay)||0)),streak:Math.max(0,Math.floor(Number(p.dailyGift?.streak)||0)),total:Math.max(0,Math.floor(Number(p.dailyGift?.total)||0))};
+    if (!p.lakeRewards) for(let group=0;group<Math.floor((out.level-1)/C.lakeLength);group++) if(Array.from({length:C.lakeLength},(_,i)=>out.stars[`l${group*C.lakeLength+i+1}`]).every(Boolean)) {
+      out.lakeRewards[group]=true;
+      out.tokens=Math.min(C.maxTokens,out.tokens+C.lakeCompletionCoins);
+    }
     if (!out.dailyTrail || !Array.isArray(out.dailyTrail.results)) out.dailyTrail = null;
     else { out.dailyTrail.stage = Math.max(0, Math.min(C.dailyLength - 1, Math.floor(Number(out.dailyTrail.stage) || 0))); out.dailyTrail.results = out.dailyTrail.results.slice(0,C.dailyLength); }
     if (!out.goals || !Array.isArray(out.goals.solves) || !Array.isArray(out.goals.claimed)) out.goals = freshProgress().goals;
@@ -44,6 +56,7 @@ export function discoveries(p) {
   const campaign = Object.entries(p.stars).filter(([key,value]) => /^l\d+$/.test(key) && value > 0);
   const trails = Object.values(p.dailyResults).filter(r => r?.trail).length;
   const perfect = campaign.filter(([,value]) => value === 3).length;
+  const gifts = p.dailyGift?.total || 0, stars = totalStars(p);
   return [
     { id:'first-chapter', name:'First light', detail:'Complete 5 journey lakes', value:campaign.length, target:5, reward:2 },
     { id:'ten-lakes', name:'Echo explorer', detail:'Complete 10 journey lakes', value:campaign.length, target:10, reward:2 },
@@ -51,14 +64,62 @@ export function discoveries(p) {
     { id:'three-trails', name:'A familiar shore', detail:'Finish daily trails on 3 different days', value:trails, target:3, reward:3 },
     { id:'thirty-lakes', name:'Far shores', detail:'Complete 30 journey lakes', value:campaign.length, target:30, reward:3 },
     { id:'seven-trails', name:'A lakeside ritual', detail:'Finish daily trails on 7 different days', value:trails, target:7, reward:4 },
-  ].map(d => ({...d, earned:!!p.discoveries[d.id]}));
+    { id:'three-perfect', name:'Three bright lights', detail:'Earn 3 stars on 3 lakes', value:perfect, target:3, reward:2 },
+    { id:'twenty-lakes', name:'Across the water', detail:'Complete 20 journey lakes', value:campaign.length, target:20, reward:3 },
+    { id:'forty-lakes', name:'New currents', detail:'Complete 40 journey lakes', value:campaign.length, target:40, reward:4 },
+    { id:'sixty-lakes', name:'Six shores', detail:'Complete 60 journey lakes', value:campaign.length, target:60, reward:5 },
+    { id:'eighty-lakes', name:'Further still', detail:'Complete 80 journey lakes', value:campaign.length, target:80, reward:6 },
+    { id:'hundred-lakes', name:'The long way home', detail:'Complete 100 journey lakes', value:campaign.length, target:100, reward:8 },
+    { id:'twenty-five-perfect', name:'A steady hand', detail:'Earn 3 stars on 25 lakes', value:perfect, target:25, reward:5 },
+    { id:'fifty-perfect', name:'Every ripple counts', detail:'Earn 3 stars on 50 lakes', value:perfect, target:50, reward:7 },
+    { id:'first-trail', name:'A day by the water', detail:'Finish 1 daily trail', value:trails, target:1, reward:2 },
+    { id:'fourteen-trails', name:'Two weeks of lakes', detail:'Finish daily trails on 14 days', value:trails, target:14, reward:6 },
+    { id:'thirty-trails', name:'A month of lakes', detail:'Finish daily trails on 30 days', value:trails, target:30, reward:8 },
+    { id:'seven-gifts', name:'A week of visits', detail:'Claim 7 daily rewards', value:gifts, target:7, reward:4 },
+    { id:'twenty-eight-gifts', name:'A familiar place', detail:'Claim 28 daily rewards', value:gifts, target:28, reward:8 },
+    { id:'fifty-stars', name:'Golden water', detail:'Collect 50 stars', value:stars, target:50, reward:3 },
+    { id:'hundred-fifty-stars', name:'All the light', detail:'Collect 150 stars', value:stars, target:150, reward:6 },
+  ].map(d => ({...d, earned:!!p.discoveries[d.id], ready:d.value>=d.target&&!p.discoveries[d.id]}));
 }
-export function awardDiscoveries(p) {
-  const earned = discoveries(p).filter(d => !d.earned && d.value >= d.target);
-  for (const d of earned) { p.discoveries[d.id] = true; p.tokens = Math.min(C.maxTokens, p.tokens + d.reward); }
-  return earned.map(({id,name,reward}) => ({id,name,reward}));
+export function readyDiscoveries(p) { return discoveries(p).filter(d=>d.ready).map(({id,name,reward})=>({id,name,reward})); }
+export function claimDiscovery(p, id) {
+  const discovery = discoveries(p).find(d=>d.id===id && d.ready);
+  if (!discovery) return null;
+  p.discoveries[id] = true;
+  p.tokens = Math.min(C.maxTokens,p.tokens+discovery.reward);
+  return {id,name:discovery.name,reward:discovery.reward};
 }
 export function spend(p, cost) { if (p.tokens < cost) return false; p.tokens -= cost; return true; }
+export function lightForLake(p, number) {
+  const lake=lakeForLevel(number);
+  return p.lakeLights?.[lake.group] || (lake.themeIndex===3?'night':'day');
+}
+export function setLakeLight(p, number, light) {
+  if (!Number.isSafeInteger(number) || number<1 || lakeForLevel(number).first>p.level || !['day','night'].includes(light)) return false;
+  p.lakeLights[lakeForLevel(number).group]=light;
+  return true;
+}
+export function claimDailyGift(p, day = daySeed()) {
+  if (!Number.isSafeInteger(day) || day<1 || p.dailyGift.lastDay>=day) return null;
+  const streak = p.dailyGift.lastDay===day-1 ? p.dailyGift.streak+1 : 1;
+  const reward=C.dailyGiftCoins[(streak-1)%C.dailyGiftCoins.length];
+  p.dailyGift={lastDay:day,streak,total:p.dailyGift.total+1};
+  p.tokens=Math.min(C.maxTokens,p.tokens+reward);
+  return {streak,reward};
+}
+export function buyCosmetic(p,kind,id) {
+  const catalog=C.cosmetics[kind];
+  const item=catalog?.find(entry=>entry.id===id);
+  if (!item || p.cosmetics[kind].includes(id) || !spend(p,item.cost)) return false;
+  p.cosmetics[kind].push(id);
+  p.cosmetics[kind==='stones'?'stone':'lantern']=id;
+  return true;
+}
+export function equipCosmetic(p,kind,id) {
+  if (!C.cosmetics[kind]?.some(item=>item.id===id) || !p.cosmetics[kind].includes(id)) return false;
+  p.cosmetics[kind==='stones'?'stone':'lantern']=id;
+  return true;
+}
 export function buyNextLake(p, number) {
   if (!Number.isSafeInteger(number) || number !== p.level + 1 || p.level < 2 || !spend(p,C.lakeSkipCost)) return false;
   p.level = number;
@@ -74,19 +135,23 @@ export function complete(p, key, stones, par, resetUsed, stats = {}) {
   if (stars === 3) p.goals.three = true; if (!resetUsed) p.goals.clean = true;
   let goalBonus = 0;
   goals(p).forEach((g,i) => { if (g.value >= g.target && !p.goals.claimed.includes(i)) { p.goals.claimed.push(i); p.bonus += C.goalReward; goalBonus += C.goalReward; } });
-  let chapterReward = false, masteryReward = false;
+  let chapterReward = false, masteryReward = false, lakeReward = false, newLake = null;
   if (key.startsWith('l')) {
-    const ch = chapter(Number(key.slice(1)));
+    const number=Number(key.slice(1)), ch = chapter(number), lake=lakeForLevel(number);
     if (!p.chapters[ch.index] && Array.from({length:C.chapterLength}, (_,i) => p.stars[`l${ch.first + i}`]).every(Boolean)) {
       p.chapters[ch.index] = true; p.bonus += C.chapterBonus; p.tokens = Math.min(C.maxTokens, p.tokens + C.chapterTokens); chapterReward = true;
     }
     if (!p.mastery[ch.index] && chapterProgress(p, Number(key.slice(1))).mastered) {
       p.mastery[ch.index] = true; p.tokens = Math.min(C.maxTokens, p.tokens + C.masteryTokens); masteryReward = true;
     }
+    if (!p.lakeRewards[lake.group] && Array.from({length:C.lakeLength},(_,i)=>p.stars[`l${lake.first+i}`]).every(Boolean)) {
+      p.lakeRewards[lake.group]=true;p.tokens=Math.min(C.maxTokens,p.tokens+C.lakeCompletionCoins);lakeReward=true;
+    }
+    if (first && number===lake.last && p.level<=number) newLake=lakeForLevel(number+1).name;
   }
   // Keep detailed records bounded; best stars and chapter unlocks are retained.
   const keys = Object.keys(p.records); for (const key of keys.slice(0, Math.max(0, keys.length - C.recordLimit))) delete p.records[key];
-  return { stars, gained: totalStars(p) - before, better: stones < par, newRecord, first, chapterReward, masteryReward, goalBonus, themesUnlocked:C.themes.filter(t=>t.unlock>before&&t.unlock<=totalStars(p)).map(t=>t.name), discoveries:awardDiscoveries(p) };
+  return { stars, gained: totalStars(p) - before, better: stones < par, newRecord, first, chapterReward, masteryReward, lakeReward, newLake, goalBonus, discoveries:readyDiscoveries(p) };
 }
 export function dailyRun(p, day = daySeed()) {
   if (p.dailyTrail?.day !== day) p.dailyTrail = { day, stage: 0, results: [] };
@@ -104,6 +169,6 @@ export function finishDaily(p, day, stage, result, stones) {
     p.tokens = Math.min(C.maxTokens, p.tokens + C.dailyTokens);
   }
   p.dailyResults[day] = { ...record, trail: true };
-  result.discoveries = [...(result.discoveries || []), ...awardDiscoveries(p)];
+  result.discoveries = [...new Map([...(result.discoveries || []),...readyDiscoveries(p)].map(d=>[d.id,d])).values()];
   return record;
 }

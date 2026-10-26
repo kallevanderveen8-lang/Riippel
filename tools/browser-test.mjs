@@ -40,13 +40,19 @@ try{
  await page.click('#result-journal');
  assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),true);
  await page.click('#page-back');
- assert.match(await page.locator('#mastery-progress').innerText(),/Mastered/);
- assert.equal(await page.locator('.discovery.earned').count(),3);
- assert.equal(await page.locator('#theme-options button').count(),6);
+ assert.match(await page.locator('#mastery-progress').innerText(),/30\/30 stars/);
+ assert.equal(await page.locator('#lake-list button').count(),10);
+ await page.click('#jump-keepsakes');
+ assert.ok(await page.locator('.discovery.ready').count()>=3);
+ await page.locator('.claim-milestone').first().click();
+ assert.equal(await page.locator('#reward-toast').isVisible(),true);
+ while(await page.locator('.claim-milestone').count())await page.locator('.claim-milestone').first().click();
+ assert.ok(await page.locator('.discovery.earned').count()>=3);
+ assert.equal(await page.locator('#theme-options button').count(),2);
  await page.screenshot({path:'reports/journal.png'});await closeJournal('#close-dialog');
  await page.reload();await page.waitForFunction(()=>window.__ripple?.state.phase==='complete');
  assert.ok(await page.evaluate(()=>window.__ripple.state.progress.mastery[1]&&window.__ripple.state.progress.discoveries['ten-perfect']));
- checks.push('result opens journal; chapter mastery, six atmospheres and keepsakes survive reload');
+ checks.push('result opens Collection; ten-level lake, claimed milestones and mastery survive reload');
  await page.evaluate(()=>window.__ripple.go(3));await page.evaluate(()=>window.__ripple.place([{x:36,y:64,delay:0}]));await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),1);checks.push('failed drop preserves stones and permits retry');
  await page.evaluate(()=>window.__ripple.go(6));await page.evaluate(()=>window.__ripple.place([{x:36,y:64,delay:0}]));for(let i=0;i<2;i++){await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');}const hints=await page.evaluate(()=>window.__ripple.state.progress.tokens);await page.click('#help-open');await page.click('#hint');assert.ok(await page.evaluate(()=>window.__ripple.state.paused));await page.click('#hint-token');assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),hints-1);assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('earned hint dialog pauses and consumes exactly one token');
  for(let i=0;i<2;i++){await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');}

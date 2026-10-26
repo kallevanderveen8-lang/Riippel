@@ -1,13 +1,13 @@
 {
   "passed": true,
-  "firstContentfulPaintMs": 208,
+  "firstContentfulPaintMs": 192,
   "checks": [
     "initial interactive pond, SDK blocked",
     "pointer placement and mid-level restore",
     "second pointer cannot steal a drag; pause rolls back and saves the original stone",
     "first pond solve, stars and full-screen wave continuation",
     "all ten scripted ponds completable; chapter rewards",
-    "result opens journal; chapter mastery, six atmospheres and keepsakes survive reload",
+    "result opens Collection; ten-level lake, claimed milestones and mastery survive reload",
     "failed drop preserves stones and permits retry",
     "earned hint dialog pauses and consumes exactly one token",
     "free hints after four failures with credits remaining; guided layout after six saves and solves",

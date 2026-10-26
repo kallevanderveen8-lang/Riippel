@@ -488,3 +488,54 @@ header{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center
 @media(max-width:900px){#collection-dialog .journal-sidebar{padding:0 18px}#collection-dialog #journal-body{padding:16px 18px 20px}#collection-dialog #lake-list button{min-height:136px;padding:12px 9px}.collection-wallet{padding:0 2px}}
 @media(max-height:600px){header{padding-top:calc(16px + var(--safe-top))}#collection-dialog .dialog-header{min-height:60px;padding:8px 18px}#collection-dialog .journal-layout{height:calc(100dvh - 159px)}#collection-dialog .journal-sidebar,#collection-dialog .journal-tabs button{min-height:44px}#collection-dialog #journal-body{padding-top:11px}#collection-dialog .lake-pages{margin-bottom:9px}#collection-dialog #lake-list button{min-height:112px}#collection-dialog .dialog-footer{padding:5px 18px}.collection-top{min-height:44px}}
 @media(min-width:2560px) and (min-height:1400px){#collection-dialog{width:min(1300px,calc(100% - 160px))}#collection-dialog .journal-layout{height:630px}#collection-dialog #lake-list button{min-height:220px}#collection-dialog #journal-body{padding:34px}}
+
+/* Ten levels belong to one place; rewards and cosmetics use the same quiet materials. */
+#collection-dialog #lake-list{grid-template-columns:repeat(5,minmax(0,1fr))}
+#collection-dialog #lake-list button{min-height:124px;padding:12px 13px;gap:5px}
+#collection-dialog #lake-list .lake-number{font-size:1.65rem}
+#collection-dialog #lake-list .lake-label{min-height:0;line-height:1.2}
+#collection-dialog #lake-list small{font-size:.6875rem}
+#collection-dialog:has(#panel-lakes:not([hidden])) .journal-layout{max-height:calc(100dvh - 160px)}
+.light-scene{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(180px,1fr);gap:22px;align-items:center;border:1px solid #a7c6ba55;border-radius:12px;background:#0d3035ab;overflow:hidden}
+.light-scene img{display:block;width:100%;height:225px;object-fit:cover;transition:filter 280ms ease}
+.light-scene img.night{filter:brightness(.46) saturate(.75) hue-rotate(14deg)}
+.light-scene>div{padding:18px 24px 18px 0}
+.light-scene h3{font:400 1.7rem Georgia,serif;margin:9px 0;color:#f4efe2}
+.light-scene p{font-size:.8125rem;line-height:1.5;color:#c8d9cc}
+.light-options{display:flex!important;grid-template-columns:none!important;gap:10px!important;margin-top:16px!important}
+#theme-options.light-options button{display:block;flex:1;min-height:48px;padding:11px 20px;text-align:center;font-size:.875rem;font-weight:550;border:1px solid #abc9bc78;border-radius:8px;background:#15383bad}
+#theme-options.light-options button[aria-pressed=true]{border-color:#e4d6a9;background:#b4c8a726;box-shadow:inset 0 2px #e7d49f;color:#fff5db}
+#panel-mood>.section-note{margin-top:10px;color:#c6d8c9}
+.daily-gift{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 24px;border:1px solid #e2cd9894;border-radius:11px;background:linear-gradient(105deg,#47655891,#0f3537bc 70%)}
+.daily-gift h3{margin:5px 0;font:400 1.35rem Georgia,serif;color:#fff0d1}
+.daily-gift p{margin:0;color:#d8e4d6;font-size:.8125rem}
+.daily-gift button{min-width:160px}
+.daily-gift button:disabled{opacity:.7}
+.has-reward{position:relative}
+.has-reward:after{content:'';position:absolute;right:7px;top:6px;width:7px;height:7px;border-radius:50%;background:#f3d593;box-shadow:0 0 8px #f4d591bc}
+#discoveries{align-items:stretch}
+.discovery.ready{border-color:#ead9aa;background:linear-gradient(145deg,#536c58a8,#183b3db0 72%);box-shadow:0 0 0 1px #d8c99d22}
+.discovery:focus{outline:2px solid #e9d49e;outline-offset:2px}
+.discovery.ready>.icon,.discovery.ready strong{color:#f3dfaa}
+.discovery .claim-milestone{margin-top:8px;min-height:42px;width:100%;font-size:.8125rem}
+.discovery.earned{background:#b0c6ad13;border-color:#96b7a56b}
+.discovery.earned strong,.discovery.earned>.icon{color:#c9d8ba}
+#shop-items{display:grid;gap:24px}
+.shop-group h3{margin:0 0 12px;font:400 1.35rem Georgia,serif;color:#f4efe2}
+.shop-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.shop-card{display:grid;grid-template-columns:58px minmax(0,1fr);grid-template-rows:1fr auto;align-items:center;gap:9px 11px;padding:11px;border:1px solid #98b7ac66;border-radius:10px;background:#123438a6;min-width:0}
+.shop-card.equipped{border-color:#e3cf9a;background:#2e4b42a8}
+.shop-card img{width:58px;height:58px;object-fit:contain;grid-row:1}
+.shop-card strong{display:block;font-size:.8125rem;color:#f2eee1}
+.shop-card small{font-size:.6875rem;color:#b9cdbf}
+.shop-card button{grid-column:1/-1;min-height:44px;border:1px solid #b8d2bb80;border-radius:7px;background:#b5ccb71d;color:#f7e8ba;font-size:.75rem}
+.shop-card button:not(:disabled):hover{background:#b5ccb73a}
+.shop-card button:disabled{opacity:.66}
+#reward-toast{position:fixed;z-index:1000;left:50%;bottom:28px;transform:translateX(-50%);display:flex;align-items:center;gap:13px;min-width:220px;padding:13px 20px;border:1px solid #e2d59da8;border-radius:12px;background:#153c39f2;box-shadow:0 15px 45px #061f26aa;color:#f9edcf;pointer-events:none}
+#reward-toast[hidden]{display:none}
+#reward-toast .icon{width:26px;height:26px;color:#edd39a}
+#reward-toast strong,#reward-toast span{display:block}
+#reward-toast strong{font-size:.875rem}
+#reward-toast div span{margin-top:3px;color:#cde0ca;font-size:.75rem}
+@media(max-height:600px){#collection-dialog #lake-list button{min-height:80px;padding:6px 10px;gap:3px}#collection-dialog #lake-list .lake-number{font-size:1.25rem}#collection-dialog #lake-list .lake-label{font-size:.75rem}#collection-dialog .lake-pages{margin-bottom:5px}.light-scene img{height:155px}.daily-gift{padding:12px 18px}}
+@media(max-width:800px){.shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.light-scene img{height:190px}}
