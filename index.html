@@ -2,36 +2,107 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#253940"><meta name="description" content="A quiet lake. A handful of stones. Find the moment your ripples meet.">
+<meta name="theme-color" content="#102d30"><meta name="description" content="A quiet lake. A handful of stones. Find the moment your ripples meet.">
 <title>Ripple</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23394b54'/%3E%3Cellipse cx='32' cy='34' rx='24' ry='12' fill='none' stroke='%23e4e3de' stroke-width='2'/%3E%3Cellipse cx='32' cy='31' rx='7' ry='5' fill='%238a8b82'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
 <header>
- <span class="brand" aria-label="Ripple">ripple<span class="brand-sub">STONES & STILL WATER</span></span>
- <div class="pond-heading"><span id="level-label">LAKE 01</span><h1 id="level-name">A small beginning</h1><div id="chapter-progress"></div></div>
- <nav aria-label="Game controls"><button id="daily" class="nav-button" aria-label="Daily trail">Daily trail</button><button id="sound" class="icon-button" aria-label="Mute sound">♫</button><button id="pause" class="icon-button" aria-label="Pause game">Ⅱ</button></nav>
+ <div class="pond-heading"><span id="level-label">LAKE 01</span><h1 id="level-name">A small beginning</h1></div>
+ <button id="collection-top" class="collection-top" aria-label="Open collection">Collection</button>
+ <nav aria-label="Game controls" class="game-nav"><button id="daily" class="icon-button" aria-label="Daily trail" data-tooltip="Daily trail"><span data-icon="calendar"></span></button><span class="nav-divider" aria-hidden="true"></span><button id="sound" class="icon-button" aria-label="Mute sound" aria-pressed="false" data-tooltip="Mute sound"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="sound-waves" d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/><path class="sound-off" d="m16 9 5 6m0-6-5 6"/></svg></button><span class="nav-divider" aria-hidden="true"></span><button id="pause" class="icon-button" aria-label="Pause game" data-tooltip="Pause game"><span data-icon="pause"></span></button></nav>
 </header>
 <main>
 <section class="game" aria-label="Ripple puzzle">
- <div id="pond-wrap"><canvas id="pond" aria-label="Lake: tap to place a stone, tap a stone to remove it, or drag to move it" tabindex="0"></canvas>
-  <div id="hint-finger" aria-hidden="true"><span></span><i></i></div>
-  <div id="overlay" hidden><div class="overlay-inner"><div class="eyebrow" id="overlay-kicker"></div><div id="reward-stars"></div><h2 id="overlay-title"></h2><p id="overlay-text"></p><button id="next" class="primary">Next lake <span>→</span></button><button id="replay" class="reward-choice">Replay for a better score</button><button id="double-token" class="reward-choice">Use 2 hints · Double stars</button><button id="double" class="reward-choice" hidden>Watch ad · Double stars</button><button id="copy" class="text-button" hidden>Copy daily result</button></div></div>
+ <div id="pond-wrap"><canvas id="pond" aria-label="Lake puzzle" aria-describedby="keyboard-help" tabindex="0"></canvas><p id="keyboard-help" class="keyboard-help">Arrow keys: aim · Enter: place or edit · Delete: remove · Space: drop</p><span id="keyboard-status" class="sr-only" role="status"></span>
+  <div id="hint-finger" aria-hidden="true"><span></span><i></i><em>Click the water to place a stone.</em></div>
+  <div id="overlay" role="dialog" aria-modal="true" aria-labelledby="overlay-title" aria-describedby="overlay-text" hidden><div class="overlay-inner"><div class="eyebrow" id="overlay-kicker"></div><div id="reward-stars"></div><h2 id="overlay-title"></h2><div id="result-stats" class="result-stats"></div><p id="overlay-text"></p><div id="result-discovery" class="result-discovery" hidden></div><div id="pause-details" hidden><p id="chapter-progress"></p><div class="pause-stats"><span id="par"></span><span id="attempt-label"></span></div></div><button id="next" class="primary">Next lake</button><div id="pause-actions" hidden><button id="collection-mobile" class="reward-choice"><span data-icon="journal"></span>Collection</button><button id="pause-settings" class="reward-choice"><span data-icon="settings"></span>Settings</button><button id="pause-controls" class="reward-choice"><span data-icon="controller"></span>How to play</button></div><div class="result-secondary"><button id="replay" class="reward-choice">Play again</button><button id="result-journal" class="reward-choice">Collection</button></div><details id="bonus-options"><summary>Star bonus <span data-icon="chevron"></span></summary><button id="double-token" class="reward-choice">Use 2 coins · Double stars</button><button id="double" class="reward-choice" hidden>Watch ad · Double stars</button></details><button id="copy" class="text-button" hidden>Copy daily result</button></div></div>
  </div>
- <div class="play-controls">
-  <p id="instruction" role="status" aria-live="polite">Place a stone on the water</p>
-  <div class="control-tray"><button id="reset" class="secondary" aria-label="Reset stones"><span class="reset-symbol" aria-hidden="true">↺</span><span>Reset</span></button><div class="stone-inventory"><div id="stone-tray" aria-hidden="true"></div><span><b id="stones-left">3</b> stones left</span></div><button id="drop" class="primary">Drop stones <span aria-hidden="true">↓</span></button></div>
-  <div class="pond-stats"><span id="lantern-status"><span class="lamp-icon" aria-hidden="true"></span><b id="lit-count">0 / 1</b> lanterns</span><span id="par">Par 1</span><span id="attempt-label">Take your time</span></div>
-
+ <p id="loading-status" role="status" hidden>Finding your next lake…</p>
+ <p id="instruction" class="sr-only" role="status" aria-live="polite">Place a stone on the water</p>
+ <div class="play-controls" aria-label="Stone controls">
+  <p id="feedback" aria-hidden="true" hidden></p>
+  <div class="control-tray">
+   <div class="edit-tools"><button id="undo" class="icon-button" aria-label="Undo last edit" data-tooltip="Undo · Ctrl / Cmd Z"><span data-icon="undo"></span></button><span class="tray-divider" aria-hidden="true"></span><button id="reset" class="icon-button" aria-label="Reset stones" data-tooltip="Reset stones"><span data-icon="reset"></span></button></div>
+   <span class="tray-divider" aria-hidden="true"></span>
+   <div class="stone-inventory"><div id="stone-tray" aria-hidden="true"></div><span><b id="stones-left">3</b> <span id="stones-unit">stones</span> left</span></div>
+   <span class="tray-divider" aria-hidden="true"></span>
+   <button id="drop" class="primary"><span data-icon="ripple"></span><span>Drop stones</span></button>
+  </div>
  </div>
 </section>
 </main>
-<footer><button id="dock" class="text-button" aria-label="Move controls to the top">Controls ↑</button><button id="hint" class="text-button" hidden>Hint</button><button id="collection-mobile" class="text-button">Collection <span class="collection-stars">✧ <span id="mobile-stars">0</span></span></button></footer>
-<dialog id="collection-dialog"><button id="close-dialog" class="icon-button" aria-label="Close collection">×</button><div class="eyebrow">YOUR LAKESIDE</div><h2>Small discoveries.</h2><div class="star-total"><b id="total-stars">0</b><span>stars collected</span></div><div class="progress-track"><div id="theme-progress"></div></div><div class="progress-caption"><span id="next-theme">Evening light</span><span id="unlock-count">0 / 10</span></div><button id="themes" class="theme-preview"><span id="theme-name">Morning lake</span><span>Change atmosphere ↓</span></button><div id="theme-options"></div><div class="daily-goals"><div class="eyebrow">TODAY'S GOALS · +2 STARS EACH</div><div id="goals"></div><button id="reroll-token" class="reward-choice">Use 1 hint · Easier daily goal</button><button id="reroll" class="reward-choice" hidden>Watch ad · Easier daily goal</button></div><div class="daily-teaser"><span id="token-balance"></span><b id="daily-title">A lake to share</b><p id="daily-teaser">Daily lake unlocks after lake 3.</p></div><section class="lake-library"><div class="eyebrow">REVISIT A LAKE · BEAT YOUR BEST</div><div class="lake-pages"><button id="page-back" class="text-button" aria-label="Previous chapter">←</button><span id="lake-page"></span><button id="page-next" class="text-button" aria-label="Next chapter">→</button></div><div id="lake-list"></div></section><div id="mobile-goals" hidden></div></dialog>
-<dialog id="hint-dialog"><div class="eyebrow">A LITTLE DIRECTION</div><h2>Follow a ripple.</h2><p id="hint-description">Reveal one place to put a stone.</p><button id="hint-token" class="reward-choice">Use 1 hint · Reveal a stone</button><button id="hint-ad" class="reward-choice" hidden>Watch ad · Reveal a stone</button><button id="hint-free" class="reward-choice" hidden>Reveal a stone · Free help</button><button id="hint-close" class="reward-choice">Keep trying</button></dialog>
-<div hidden aria-hidden="true"><span id="footer-theme"></span><span id="chapter"></span><span id="journey-number"></span><div id="journey"></div><span id="pond-tag"></span></div>
+<footer>
+ <div class="footer-tools"><button id="help-open" class="icon-button" aria-label="Help" data-tooltip="Help"><span data-icon="question"></span></button><button id="how-to" class="icon-button" aria-label="How to play" data-tooltip="How to play"><span data-icon="controller"></span></button></div>
+ <div class="pond-status" aria-label="Lake progress"><span id="lantern-status" role="status" aria-live="polite"><span data-icon="lantern"></span><span id="lit-count">0 / 1</span><span class="sr-only"> lanterns lit</span></span><span class="nav-divider" aria-hidden="true"></span><span class="star-status"><span data-icon="star"></span><span id="mobile-stars">0</span><span class="sr-only"> stars</span></span></div>
+</footer>
+<dialog id="collection-dialog" aria-labelledby="journal-title">
+ <div class="dialog-header"><h2 id="journal-title">Collection</h2><div class="collection-header-actions"><span class="collection-wallet" aria-label="Coin balance" title="Earn a coin by finishing a new lake"><span data-icon="coin"></span><strong id="journal-balance">3</strong><span>coins</span></span><button id="continue-journey" class="primary">Play lake</button><button id="close-dialog" class="icon-button" aria-label="Close collection"><span data-icon="close"></span></button></div></div>
+ <div class="journal-layout"><div class="journal-sidebar"><div class="journal-tabs" role="tablist" aria-label="Journal sections" aria-orientation="horizontal">
+  <button id="tab-lakes" role="tab" aria-selected="true" aria-controls="panel-lakes" data-panel="lakes"><span data-icon="lake"></span><span>Levels</span></button>
+  <button id="jump-goals" role="tab" aria-selected="false" aria-controls="panel-today" data-panel="today" tabindex="-1"><span data-icon="calendar"></span><span>Today</span></button>
+  <button id="jump-keepsakes" role="tab" aria-selected="false" aria-controls="panel-keepsakes" data-panel="keepsakes" tabindex="-1"><span data-icon="award"></span><span>Keepsakes</span></button>
+  <button id="tab-mood" role="tab" aria-selected="false" aria-controls="panel-mood" data-panel="mood" tabindex="-1"><span data-icon="sun"></span><span>Landscapes</span></button>
+ </div><div class="journal-summary"><span data-icon="star"></span><strong id="journal-stars">0</strong></div>
+ </div>
+ <div class="dialog-body" id="journal-body">
+  <section id="panel-lakes" role="tabpanel" aria-labelledby="tab-lakes" tabindex="0">
+   <section class="lake-library"><div class="lake-pages"><button id="page-back" class="icon-button" aria-label="Previous chapter"><span data-icon="arrow-left"></span></button><div><h3 id="lake-page"></h3><span id="mastery-progress"></span></div><button id="page-next" class="icon-button" aria-label="Next chapter"><span data-icon="arrow-right"></span></button></div><div id="lake-list"></div><button id="mastery-replay" class="text-button" hidden>Improve a lake</button></section>
+  </section>
+  <section id="panel-today" role="tabpanel" aria-labelledby="jump-goals" tabindex="0" hidden>
+   <div class="daily-teaser"><h3 id="daily-title">A lake to share</h3><p id="daily-teaser">Daily trail unlocks after lake 3.</p><button id="journal-daily" class="primary">Play daily trail</button></div>
+   <div class="daily-goals"><h3>Today’s goals</h3><p class="section-note">Earn 2 bonus stars for each completed goal.</p><div id="goals"></div><button id="reroll-token" class="reward-choice">Use 1 coin · Easier daily goal</button><button id="reroll" class="reward-choice" hidden>Watch ad · Easier daily goal</button></div>
+   <p id="token-balance"></p>
+  </section>
+  <section id="panel-keepsakes" role="tabpanel" aria-labelledby="jump-keepsakes" tabindex="0" hidden>
+   <div class="section-heading"><h3>Keepsakes</h3><span id="discovery-count"></span></div><p class="journal-note">Milestones from your time on the water. Each one earns coins.</p><div id="discoveries"></div>
+  </section>
+  <section id="panel-mood" role="tabpanel" aria-labelledby="tab-mood" tabindex="0" hidden>
+   <div class="star-total"><b id="total-stars">0</b><span>stars collected</span></div><div class="progress-track" role="progressbar" aria-label="Next landscape" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="theme-progress"></div></div><div class="progress-caption"><span id="next-theme">Evening light</span><span id="unlock-count">0 / 10</span></div>
+   <div id="themes" class="theme-preview"><h3 id="theme-name">Morning lake</h3><p class="section-note" id="theme-description">Jade water, mossy stones and fern-lined banks.</p></div><div id="theme-options"></div>
+  </section>
+ </div></div>
+ <div class="dialog-footer"><div class="dialog-footer-actions"><button id="journal-settings" class="text-button"><span data-icon="settings"></span>Settings</button><button id="journal-back" class="reward-choice"><span data-icon="arrow-left"></span>Back to the lake</button></div></div>
+</dialog>
+<dialog id="help-dialog" aria-labelledby="help-title">
+ <div class="dialog-header"><div><div class="eyebrow">A LITTLE GUIDANCE</div><h2 id="help-title">Let your ripples meet.</h2></div><button id="help-dismiss" class="icon-button" aria-label="Close help"><span data-icon="close"></span></button></div>
+ <div class="dialog-body"><p class="help-intro">Place stones on the water, then drop them. Light every lantern with the waves. Where ripples meet, they grow stronger.</p><div class="help-lake"><h3 id="help-lake-name"></h3><p id="help-tip"></p><p id="help-scoring"></p></div><p class="section-note">Take your time. You can move or remove stones, undo an edit and try again as often as you like.</p><button id="hint" class="reward-choice" hidden>Hint</button></div>
+ <div class="dialog-footer"><button id="help-close" class="primary">Back to the lake<span data-icon="arrow-right"></span></button></div>
+</dialog>
+<dialog id="hint-dialog" aria-labelledby="hint-title" aria-describedby="hint-description">
+ <div class="dialog-header"><div><div class="eyebrow">A LITTLE GUIDANCE</div><h2 id="hint-title">Find your next ripple</h2></div><button id="hint-dismiss" class="icon-button" aria-label="Close hints"><span data-icon="close"></span></button></div>
+ <div class="dialog-body"><p id="hint-description">Reveal one place to put a stone.</p><button id="hint-token" class="reward-choice">Use 1 coin · Reveal a stone</button><button id="hint-ad" class="reward-choice" hidden>Watch ad · Reveal a stone</button><button id="hint-free" class="reward-choice" hidden>Reveal a stone · Free help</button><button id="hint-guide" class="reward-choice" hidden>Place a guided layout · Free</button></div>
+ <div class="dialog-footer"><button id="hint-close" class="primary">Keep trying</button></div>
+</dialog>
+<dialog id="controls-dialog" aria-labelledby="controls-title">
+ <div class="dialog-header"><div><div class="eyebrow">HOW TO PLAY</div><h2 id="controls-title">Light every lantern.</h2></div><button id="controls-dismiss" class="icon-button" aria-label="Close instructions"><span data-icon="close"></span></button></div>
+ <div class="dialog-body"><p class="help-intro">Where ripples meet, they grow stronger. Fewer stones earn more stars.</p><ol class="guide-steps"><li><b>01</b><span><strong>Place</strong>Click open water to place a stone.</span></li><li><b>02</b><span><strong>Adjust</strong>Drag a stone to move it. Right-click to remove it.</span></li><li><b>03</b><span><strong>Drop</strong>Press Drop stones. Watch the waves, then try again.</span></li></ol><details class="guide-more"><summary>Keyboard and advanced controls <span data-icon="chevron"></span></summary><div class="help-columns"><section><h3>Keyboard</h3><dl><dt>Aim</dt><dd>Arrow keys · Shift moves faster</dd><dt>Place or edit</dt><dd><kbd>Enter</kbd></dd><dt>Remove</dt><dd><kbd>Delete</kbd></dd><dt>Drop stones</dt><dd><kbd>Space</kbd></dd><dt>Undo</dt><dd><kbd>Ctrl / Cmd Z</kbd></dd></dl></section><section><h3>View</h3><dl><dt>Zoom</dt><dd>Mouse wheel over the lake</dd><dt>Move the lake</dt><dd>Drag open water</dd><dt>Center</dt><dd>Press <kbd>0</kbd> or <button id="reset-view" class="inline-action">reset view</button></dd><dt>Delayed stones · lake 15+</dt><dd>Click a stone to cycle 0, 1 or 2 seconds</dd></dl></section></div></details></div>
+ <div class="dialog-footer"><button id="dock" class="reward-choice" aria-label="Move controls to the top"><span data-icon="move"></span>Move toolbar up</button><button id="controls-close" class="primary">Back to the lake<span data-icon="arrow-right"></span></button></div>
+</dialog>
+<dialog id="settings-dialog" aria-labelledby="settings-title">
+ <div class="dialog-header"><div><div class="eyebrow">THE LAKE, YOUR WAY</div><h2 id="settings-title">Settings</h2><p class="dialog-lead" id="settings-context">Lake 01</p></div><button id="settings-dismiss" class="icon-button" aria-label="Close settings"><span data-icon="close"></span></button></div>
+ <div class="dialog-body settings-body">
+  <section class="settings-section" aria-labelledby="settings-audio-title"><h3 class="settings-group-label" id="settings-audio-title">AUDIO</h3><div class="settings-list">
+   <label class="settings-row" for="setting-sound"><span class="settings-row-copy"><strong>Sound</strong><small id="setting-sound-note" class="sr-only">All game audio</small></span><input id="setting-sound" type="checkbox" role="switch" checked></label>
+   <label class="settings-row" for="setting-ambience"><span class="settings-row-copy"><strong>Lake ambience</strong><small class="sr-only">Water and soft background tones</small></span><input id="setting-ambience" type="checkbox" role="switch" checked></label>
+  </div></section>
+  <section class="settings-section" aria-labelledby="settings-display-title"><h3 class="settings-group-label" id="settings-display-title">DISPLAY</h3><div class="settings-list">
+   <label class="settings-row" for="setting-motion"><span class="settings-row-copy"><strong>Calmer motion</strong><small class="sr-only">Reduce water shimmer and menu movement</small></span><input id="setting-motion" type="checkbox" role="switch"></label>
+   <label class="settings-row" for="setting-contrast"><span class="settings-row-copy"><strong>Clearer contrast</strong><small class="sr-only">Stronger borders and text on menus</small></span><input id="setting-contrast" type="checkbox" role="switch"></label>
+  </div></section>
+  <section class="settings-section" aria-labelledby="settings-controls-title"><h3 class="settings-group-label" id="settings-controls-title">CONTROLS</h3><div class="settings-list">
+   <label class="settings-row" for="setting-dock"><span class="settings-row-copy"><strong>Toolbar at the top</strong><small class="sr-only">Keep the lower shore clear</small></span><input id="setting-dock" type="checkbox" role="switch"></label>
+  </div></section>
+ </div>
+ <div class="dialog-footer"><button id="settings-howto" class="text-button">How to play <span data-icon="arrow-right"></span></button><div class="dialog-footer-actions"><span class="journal-footer-note">Saved automatically</span><button id="settings-close" class="primary">Done</button></div></div>
+</dialog>
+<dialog id="welcome-dialog" aria-labelledby="welcome-title" aria-describedby="welcome-description">
+ <div class="welcome-scene" aria-hidden="true"></div>
+ <div class="welcome-content"><div class="eyebrow">YOUR FIRST RIPPLE</div><h2 id="welcome-title">Let the lake answer.</h2><p id="welcome-description">Place one stone. Watch its ripples reach the lantern. The water will show you the rest.</p><div class="welcome-actions"><button id="welcome-start" class="primary">Show me how <span data-icon="arrow-right"></span></button><button id="welcome-skip" class="text-button">Play on my own</button></div></div>
+</dialog>
+<div id="tutorial-target" aria-hidden="true" hidden></div>
+<aside id="tutorial-tip" aria-live="polite" hidden><span id="tutorial-step" class="eyebrow">STEP 1 OF 2</span><strong id="tutorial-title">Place a stone</strong><p id="tutorial-copy">Click the open water inside the ring.</p><button id="tutorial-skip" class="text-button">Skip guide</button></aside>
 <pre id="debug" hidden></pre>
 </div>
 <div id="ad-shield" hidden role="status" aria-live="polite">Advertisement loading…</div>

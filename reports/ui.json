@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "checks": [
+    "First visit, settings, coin purchase persistence, and cursor zoom/empty-water pan work at 800×450",
+    "Keyboard placement, removal and solve; result focus stays within its choices",
+    "Bonus disclosure stays keyboard accessible, pays once after reload and explains newly unlocked landscapes",
+    "Journal tabs support arrow/Home/End keys; native dismissal restores focus",
+    "Dragging respects the original grab offset",
+    "Undo restores removals, resets and moves through both its button and the focused-lake shortcut",
+    "Right-click removes stones; instructions pause and restore focus; mastery replay returns to the unlocked journey",
+    "All four journal panels fit compact through Full HD desktop with reachable close/back and 44px+ targets",
+    "Minimal HUD has no overlapping panels or permanent instructions; Help, pause-to-Controls and Journal retain focus and pause correctly",
+    "200% text keeps horizontal journal navigation, scrolls content and keeps game controls on screen",
+    "Top/bottom safe-area insets keep controls clear of device chrome",
+    "Actual light/dark panel text colors exceed 4.5:1 contrast",
+    "Reduced motion/transparency and increased contrast respond without reloading",
+    "Timed stones can be edited with the keyboard; desktop, compact and enlarged-text timing labels captured",
+    "Six real landscape previews are distinct; locked rewards stay locked; switching and reloading preserves the puzzle and selected landscape"
+  ],
+  "contrastRows": [
+    {
+      "colorScheme": "light",
+      "ratio": 12.08
+    },
+    {
+      "colorScheme": "light",
+      "ratio": 9.69
+    },
+    {
+      "colorScheme": "dark",
+      "ratio": 12.08
+    },
+    {
+      "colorScheme": "dark",
+      "ratio": 9.69
+    }
+  ],
+  "errors": []
+}

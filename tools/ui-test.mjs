@@ -1,0 +1,225 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { spawn } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+const require = createRequire(import.meta.url);
+let playwright;
+try { playwright = require('playwright'); } catch { playwright = require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES + '/playwright'); }
+const port = Number(process.env.UI_TEST_PORT || 4176);
+const server = spawn(process.execPath, ['tools/serve.mjs'], {stdio:'pipe',env:{...process.env,PORT:String(port)}});
+const checks = [], errors = [];
+let browser;
+mkdirSync('reports/ui', {recursive:true});
+try {
+  await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('UI server did not start')),10000);server.stdout.once('data',()=>{clearTimeout(timeout);resolve();});server.once('error',reject);server.once('exit',code=>{clearTimeout(timeout);reject(Error(`UI server exited: ${code}`));});});
+  browser = await playwright.chromium.launch({headless:true,...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}),args:['--no-sandbox']});
+  const guideContext = await browser.newContext({viewport:{width:1216,height:684}});
+  const guide = await guideContext.newPage();guide.on('pageerror',e=>errors.push(e.message));
+  await guide.route('https://sdk.crazygames.com/**',route=>route.abort());
+  await guide.goto(`http://localhost:${port}/?test`);await guide.waitForFunction(()=>window.__ripple?.state.level?.number===1);
+  assert.equal(await guide.locator('#welcome-dialog').isVisible(),true);
+  await guide.screenshot({path:'reports/ui/welcome-first-run.png',animations:'disabled'});
+  await guide.click('#welcome-start');assert.equal(await guide.locator('#tutorial-tip').isVisible(),true);
+  const target = await guide.evaluate(()=>{const s=window.__ripple.state.level.solution[0],v=window.__ripple.state.view;return {x:v.x+v.width*s.x/128,y:v.y+v.height*s.y/128};});
+  await guide.mouse.click(target.x,target.y);assert.match(await guide.locator('#tutorial-step').innerText(),/STEP 2/);
+  await guide.click('#drop');await guide.waitForFunction(()=>window.__ripple.state.phase==='complete');
+  assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.tutorialDone),true);
+  await guide.reload();await guide.waitForFunction(()=>window.__ripple?.state.level?.number===1);
+  assert.equal(await guide.locator('#welcome-dialog').isVisible(),false);
+  await guide.click('#result-journal');await guide.click('#journal-settings');
+  assert.equal(await guide.locator('#settings-dialog').isVisible(),true);
+  assert.equal(await guide.locator('#settings-dialog .settings-row').count(),5);
+  await guide.locator('#setting-ambience').uncheck();
+  assert.equal(await guide.evaluate(()=>window.__ripple.sound.ambientEnabled),false);
+  await guide.locator('#setting-motion').check();await guide.locator('#setting-contrast').check();await guide.locator('#setting-dock').check();await guide.locator('#setting-sound').uncheck();
+  assert.equal(await guide.locator('#setting-ambience').isDisabled(),true);
+  await guide.screenshot({path:'reports/ui/settings.png',animations:'disabled'});
+  await guide.click('#settings-close');await guide.waitForSelector('#collection-dialog[open]');
+  await guide.click('#journal-back');await guide.reload();await guide.waitForFunction(()=>window.__ripple?.state.level?.number===1);
+  assert.deepEqual(await guide.evaluate(()=>window.__ripple.state.progress.preferences),{ambientSound:false,reducedMotion:true,highContrast:true,dockTop:true});
+  assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.muted),true);
+  assert.equal(await guide.locator('#app').evaluate(e=>e.classList.contains('dock-top')),true);
+  await guide.setViewportSize({width:800,height:450});await guide.click('#result-journal');await guide.click('#journal-settings');
+  const settingsFit=await guide.evaluate(()=>{const body=document.querySelector('#settings-dialog .dialog-body').getBoundingClientRect();return [...document.querySelectorAll('#settings-dialog .settings-row')].every(row=>{const r=row.getBoundingClientRect();return r.top>=body.top&&r.bottom<=body.bottom;})&&parseFloat(getComputedStyle(document.querySelector('.settings-row-copy strong')).fontSize)>=16;});
+  assert.equal(settingsFit,true);
+  await guide.click('#settings-howto');await guide.waitForSelector('#controls-dialog[open]');
+  assert.equal(await guide.evaluate(()=>{const body=document.querySelector('#controls-dialog .dialog-body').getBoundingClientRect();return [...document.querySelectorAll('.guide-steps li')].every(row=>{const r=row.getBoundingClientRect();return r.top>=body.top&&r.bottom<=body.bottom;});}),true);
+  await guide.click('.guide-more summary');assert.equal(await guide.locator('.guide-more .help-columns').isVisible(),true);
+  await guide.click('#controls-close');await guide.waitForSelector('#collection-dialog[open]');
+  const coins=await guide.evaluate(()=>window.__ripple.state.progress.tokens);
+  await guide.click('#lake-list button:nth-child(3)');await guide.waitForFunction(()=>window.__ripple.state.level.number===3);
+  assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.tokens),coins-3);
+  await guide.reload();await guide.waitForFunction(()=>window.__ripple?.state.level?.number===3);
+  assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.tokens),coins-3);
+  await guide.click('#collection-top');assert.equal(await guide.locator('#journal-balance').innerText(),String(coins-3));await guide.click('#journal-back');
+  await guide.mouse.move(400,250);await guide.mouse.wheel(0,-300);
+  await guide.waitForFunction(()=>window.__ripple.state.view.width>innerWidth*1.08);
+  const beforePan=await guide.evaluate(()=>({...window.__ripple.state.view}));
+  await guide.mouse.move(400,250);await guide.mouse.down();await guide.mouse.move(350,225,{steps:5});await guide.mouse.up();
+  const afterPan=await guide.evaluate(()=>({...window.__ripple.state.view}));
+  assert.notEqual(afterPan.x,beforePan.x);assert.equal(await guide.evaluate(()=>window.__ripple.state.stones.length),0);
+  const projected=await guide.evaluate(()=>{const s=window.__ripple.state.level.solution[0],v=window.__ripple.state.view;return {x:v.x+v.width*s.x/128,y:v.y+v.height*s.y/128,stone:s};});
+  await guide.mouse.click(projected.x,projected.y);
+  assert.equal(await guide.evaluate(()=>window.__ripple.state.stones[0].x),projected.stone.x);
+  await guide.locator('#pond').focus();await guide.keyboard.press('0');
+  assert.ok(Math.abs((await guide.evaluate(()=>window.__ripple.state.view.width))-800*1.08)<1);
+  await guideContext.close();checks.push('First visit, settings, coin purchase persistence, and cursor zoom/empty-water pan work at 800×450');
+  const context = await browser.newContext({viewport:{width:1440,height:1000},colorScheme:'dark'});
+  const page = await context.newPage();page.on('pageerror',e=>errors.push(e.message));
+  await page.route('https://sdk.crazygames.com/**',route=>route.abort());
+  await page.goto(`http://localhost:${port}/?test`);await page.waitForFunction(()=>window.__ripple);
+  await page.click('#welcome-skip');
+
+  async function openJournal() {
+    if (await page.locator('#overlay').isHidden()) await page.click('#pause');
+    await page.click(await page.locator('#overlay').evaluate(e=>e.classList.contains('is-paused')) ? '#collection-mobile' : '#result-journal');
+  }
+  async function closeJournal(button='#journal-back') {
+    await page.click(button);
+    if (await page.locator('#overlay').evaluate(e=>!e.hidden&&e.classList.contains('is-paused'))) await page.click('#next');
+  }
+  const shot = name=>page.screenshot({path:`reports/ui/${name}.png`,animations:'disabled'});
+  await shot('desktop');
+  await page.locator('#pond').focus();await page.keyboard.press('ArrowLeft');await page.keyboard.press('ArrowRight');await page.keyboard.press('Enter');
+  assert.deepEqual(await page.evaluate(()=>window.__ripple.state.stones),[{x:64,y:64,delay:0}]);
+  await page.keyboard.press('Delete');assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),0);
+  await page.keyboard.press('Enter');await page.keyboard.press('Space');await page.waitForFunction(()=>window.__ripple.state.phase==='complete');
+  assert.equal(await page.locator('#overlay').getAttribute('role'),'dialog');
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'next');
+  for(let i=0;i<8;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.getElementById('overlay').contains(document.activeElement)),true);}
+  await shot('result');checks.push('Keyboard placement, removal and solve; result focus stays within its choices');
+  const tokensBeforeBonus=await page.evaluate(()=>window.__ripple.state.progress.tokens);
+  await page.locator('#bonus-options summary').focus();await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#double-token').isVisible(),true);
+  for(let i=0;i<8;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.getElementById('overlay').contains(document.activeElement)),true);}
+  await page.click('#double-token');assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),tokensBeforeBonus-2);
+  assert.equal(await page.locator('#bonus-options').isVisible(),false);
+  assert.match(await page.locator('#result-discovery').innerText(),/New landscape · Evening light/);
+  await page.reload();await page.waitForFunction(()=>window.__ripple?.state.phase==='complete');
+  assert.equal(await page.locator('#bonus-options').isVisible(),false);
+  checks.push('Bonus disclosure stays keyboard accessible, pays once after reload and explains newly unlocked landscapes');
+  await page.click('#result-journal');assert.equal(await page.locator('#collection-dialog').getAttribute('aria-labelledby'),'journal-title');
+  await page.locator('#tab-lakes').focus();await page.keyboard.press('ArrowRight');assert.equal(await page.locator('#jump-goals').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('#panel-today').isVisible(),true);assert.equal(await page.locator('#panel-lakes').isVisible(),false);
+  await page.keyboard.press('End');assert.equal(await page.locator('#tab-mood').getAttribute('aria-selected'),'true');
+  await page.keyboard.press('Home');assert.equal(await page.locator('#tab-lakes').getAttribute('aria-selected'),'true');
+  await page.keyboard.press('Escape');assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),false);
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'result-journal');checks.push('Journal tabs support arrow/Home/End keys; native dismissal restores focus');
+  await page.click('#next');await page.waitForFunction(()=>window.__ripple.state.level?.number===2);
+  await page.evaluate(()=>window.__ripple.place([{x:64,y:64,delay:0}]));
+  const v=await page.evaluate(()=>window.__ripple.state.view);
+  const x=v.x+v.width*64/128, y=v.y+v.height*64/128;
+  await page.mouse.move(x+10,y);await page.mouse.down();await page.mouse.move(x+10+v.width*8/128,y);await page.mouse.up();
+  assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),72);checks.push('Dragging respects the original grab offset');
+  await page.mouse.click(v.x+v.width*72/128,y,{button:'right'});assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),0);
+  await page.click('#undo');assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),72);
+  await page.click('#reset');assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),0);
+  await page.click('#undo');assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),72);
+  await page.locator('#pond').focus();await page.keyboard.press('Control+z');assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),64);
+  checks.push('Undo restores removals, resets and moves through both its button and the focused-lake shortcut');
+  await page.click('#how-to');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);await shot('controls-help');
+  await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);assert.equal(await page.evaluate(()=>document.activeElement.id),'how-to');
+  await page.evaluate(()=>{window.__ripple.state.progress.level=6;window.__ripple.state.progress.stars.l1=2;});
+  await openJournal();await page.click('#tab-lakes');await page.click('#page-back');await page.click('#mastery-replay');
+  await page.waitForFunction(()=>window.__ripple.state.level.number===1&&!window.__ripple.state.paused);
+  await openJournal();await page.click('#continue-journey');await page.waitForFunction(()=>window.__ripple.state.level.number===6&&!window.__ripple.state.paused);
+  checks.push('Right-click removes stones; instructions pause and restore focus; mastery replay returns to the unlocked journey');
+  for(const size of [[800,450],[907,510],[1216,684],[1440,1000],[1920,1080]]) {
+    await page.setViewportSize({width:size[0],height:size[1]});
+    await page.waitForTimeout(100);
+    const crowded=await page.evaluate(()=>{
+      const rectangles=['.play-controls','.footer-tools','.pond-status'].map(s=>document.querySelector(s).getBoundingClientRect());
+      return rectangles.some((a,i)=>rectangles.slice(i+1).some(b=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top));
+    });assert.equal(crowded,false,`Floating controls overlap at ${size.join('×')}`);
+    await shot(`minimal-hud-${size[0]}`);
+    await openJournal();
+    for(const tab of ['tab-lakes','jump-goals','jump-keepsakes','tab-mood']) {
+      await page.click(`#${tab}`);
+      const layout=await page.locator('#collection-dialog').evaluate(d=>{
+        const close=document.getElementById('close-dialog').getBoundingClientRect(),back=document.getElementById('journal-back').getBoundingClientRect();
+        return {overflow:d.scrollWidth>d.clientWidth,closeVisible:close.top>=0&&close.bottom<=innerHeight,backVisible:back.top>=0&&back.bottom<=innerHeight};
+      });assert.deepEqual(layout,{overflow:false,closeVisible:true,backVisible:true});
+      const undersized=await page.locator('#collection-dialog button:visible').evaluateAll(bs=>bs.filter(b=>{const r=b.getBoundingClientRect();return r.width<44||r.height<44;}).map(b=>b.id));assert.deepEqual(undersized,[]);
+      if(size[0]===800||size[0]===1216||size[0]===1920)await shot(`${size[0]}-${tab}`);
+    }
+    await closeJournal();
+  }
+  checks.push('All four journal panels fit compact through Full HD desktop with reachable close/back and 44px+ targets');
+  await page.click('#help-open');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);
+  assert.match(await page.locator('#help-scoring').innerText(),/three stars/);
+  await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>document.activeElement.id),'help-open');
+  await page.click('#pause');await page.click('#pause-controls');await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);
+  assert.equal(await page.evaluate(()=>document.activeElement.id),'pause-controls');
+  await page.click('#next');
+  assert.equal(await page.locator('#chapter-progress').isVisible(),false);
+  assert.equal(await page.locator('#collection-mobile').isVisible(),false);
+  assert.equal(await page.locator('.control-tray').innerText().then(t=>/Click to place|Drag to move|Undo|Reset/.test(t)),false);
+  assert.deepEqual(await page.locator('.game-nav button, .edit-tools button, .footer-tools button').evaluateAll(bs=>bs.filter(b=>!b.getAttribute('aria-label')).map(b=>b.id)),[]);
+  checks.push('Minimal HUD has no overlapping panels or permanent instructions; Help, pause-to-Controls and Journal retain focus and pause correctly');
+  await page.setViewportSize({width:1280,height:900});await openJournal();
+  await page.evaluate(()=>document.documentElement.style.fontSize='200%');await page.click('#tab-lakes');
+  const textLayout=await page.evaluate(()=>{
+    const tabs=[...document.querySelectorAll('[role=tab]')];
+    const list=document.getElementById('lake-list'),title=document.getElementById('journal-title');
+    return {overflow:tabs.some(t=>t.scrollWidth>t.clientWidth)||list.scrollWidth>list.clientWidth||title.scrollWidth>title.clientWidth,horizontal:tabs[1].offsetTop===tabs[0].offsetTop};
+  });assert.deepEqual(textLayout,{overflow:false,horizontal:true});await shot('text-200');
+  await closeJournal();
+  const clippedControls=await page.locator('.game-nav button, .control-tray button, footer button:visible').evaluateAll(bs=>bs.filter(b=>{const r=b.getBoundingClientRect();return r.left<0||r.right>innerWidth||r.top<0||r.bottom>innerHeight;}).map(b=>b.id));assert.deepEqual(clippedControls,[]);
+  assert.equal(await page.evaluate(()=>{const a=document.querySelector('.play-controls').getBoundingClientRect();return [...document.querySelectorAll('.footer-tools,.pond-status')].some(e=>{const b=e.getBoundingClientRect();return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;});}),false);
+  await shot('lake-text-200');await page.evaluate(()=>document.documentElement.style.fontSize='');checks.push('200% text keeps horizontal journal navigation, scrolls content and keeps game controls on screen');
+  await page.evaluate(()=>{document.documentElement.style.setProperty('--safe-top','44px');document.documentElement.style.setProperty('--safe-bottom','34px');});
+  const safe=await page.evaluate(()=>({top:document.querySelector('header nav').getBoundingClientRect().top,bottom:document.querySelector('footer').getBoundingClientRect().bottom,height:innerHeight}));assert.ok(safe.top>=44&&safe.bottom<=safe.height-34);
+  await page.evaluate(()=>{document.documentElement.style.removeProperty('--safe-top');document.documentElement.style.removeProperty('--safe-bottom');});checks.push('Top/bottom safe-area insets keep controls clear of device chrome');
+  const luminance = rgb=>rgb.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+  const contrastRows=[];
+  for(const colorScheme of ['light','dark']) {
+    await page.emulateMedia({colorScheme});await openJournal();await page.click('#tab-lakes');
+    const colors=await page.evaluate(()=>[getComputedStyle(document.getElementById('collection-dialog')).backgroundColor,getComputedStyle(document.getElementById('journal-title')).color,getComputedStyle(document.getElementById('mastery-progress')).color].map(c=>c.match(/\d+/g).slice(0,3).map(Number)));
+    for(const fg of colors.slice(1)){const a=luminance(fg),b=luminance(colors[0]),ratio=(Math.max(a,b)+.05)/(Math.min(a,b)+.05);assert.ok(ratio>=4.5);contrastRows.push({colorScheme,ratio:Number(ratio.toFixed(2))});}
+    await shot(`journal-${colorScheme}`);await closeJournal();
+  }
+  checks.push('Actual light/dark panel text colors exceed 4.5:1 contrast');
+  const cdp=await context.newCDPSession(page);
+  await cdp.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-color-scheme',value:'dark'},{name:'prefers-reduced-motion',value:'reduce'},{name:'prefers-reduced-transparency',value:'reduce'},{name:'prefers-contrast',value:'more'}]});
+  await openJournal();assert.equal(await page.evaluate(()=>document.getElementById('collection-dialog').getAnimations().length),0);
+  assert.equal(await page.locator('.play-controls').evaluate(e=>getComputedStyle(e).backdropFilter),'none');
+  assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--muted').trim()),'#e8e5d7');
+  await shot('accessibility-preferences');await closeJournal();checks.push('Reduced motion/transparency and increased contrast respond without reloading');
+  await page.evaluate(async()=>{await window.__ripple.go(15);window.__ripple.place(window.__ripple.state.level.solution.map(s=>({...s})));});
+  const timedStone=await page.evaluate(()=>({...window.__ripple.state.stones[0]}));
+  await page.locator('#pond').focus();
+  for(let n=64;n!==timedStone.x;n+=Math.sign(timedStone.x-64))await page.keyboard.press(timedStone.x<64?'ArrowLeft':'ArrowRight');
+  for(let n=64;n!==timedStone.y;n+=Math.sign(timedStone.y-64))await page.keyboard.press(timedStone.y<64?'ArrowUp':'ArrowDown');
+  await page.keyboard.press('Enter');assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].delay),((timedStone.delay||0)+1)%3);
+  await page.locator('#sound').focus();await shot('timed-desktop');
+  await page.setViewportSize({width:800,height:450});await shot('timed-compact');
+  await page.setViewportSize({width:1280,height:900});await page.evaluate(()=>document.documentElement.style.fontSize='200%');await shot('timed-text-200');
+  checks.push('Timed stones can be edited with the keyboard; desktop, compact and enlarged-text timing labels captured');
+  await page.evaluate(()=>document.documentElement.style.fontSize='');
+  await page.setViewportSize({width:1216,height:684});
+  assert.equal(await page.locator('.brand,.brand-mark').count(),0);
+  await openJournal();await page.click('#tab-mood');
+  assert.equal(await page.locator('#theme-options button').last().isDisabled(),true);
+  await page.waitForFunction(()=>[...document.querySelectorAll('#theme-options img')].every(i=>i.complete&&i.naturalWidth===300));
+  const thumbnails=await page.locator('#theme-options img').evaluateAll(images=>images.map(i=>i.src));
+  assert.equal(new Set(thumbnails).size,6);
+  await closeJournal();
+  const layoutBefore=await page.evaluate(()=>JSON.stringify({level:window.__ripple.state.level,stones:window.__ripple.state.stones}));
+  await page.evaluate(()=>window.__ripple.state.progress.bonus=200);
+  for(let i=0;i<6;i++) {
+    await openJournal();await page.click('#tab-mood');
+    await page.locator('#theme-options button').nth(i).click();
+    assert.equal(await page.locator('#theme-options button').nth(i).getAttribute('aria-pressed'),'true');
+    await closeJournal();
+    assert.equal(await page.evaluate(()=>JSON.stringify({level:window.__ripple.state.level,stones:window.__ripple.state.stones})),layoutBefore);
+    await page.waitForTimeout(80);await shot(`landscape-${i}`);
+  }
+  await page.reload();await page.waitForFunction(()=>window.__ripple?.state.level);
+  assert.equal(await page.evaluate(()=>window.__ripple.state.progress.theme),5);
+  checks.push('Six real landscape previews are distinct; locked rewards stay locked; switching and reloading preserves the puzzle and selected landscape');
+  assert.deepEqual(errors,[]);
+  writeFileSync('reports/ui.json',JSON.stringify({passed:true,checks,contrastRows,errors},null,2)+'\n');console.log(checks);
+} catch(error) {
+  writeFileSync('reports/ui.json',JSON.stringify({passed:false,checks,errors,error:String(error)},null,2)+'\n');throw error;
+} finally {await browser?.close();server.kill();}

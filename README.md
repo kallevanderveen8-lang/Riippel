@@ -1,10 +1,10 @@
 # Ripple
 
-A calm wave-interference puzzle, built for HTML5 browsers with **Canvas 2D + vanilla JavaScript**. No framework, fonts, images, music files, runtime packages, or asset downloads. Water, lanterns, rocks, stones and particles are drawn in code; sound is synthesized with WebAudio.
+A calm wave-interference puzzle for **desktop browsers with mouse and keyboard**, built with **Canvas 2D + vanilla JavaScript**. Six photorealistic lake plates, small journal previews, a transparent stone atlas and an angular boulder are bundled locally as WebP images. There are no runtime packages or art downloads; sound is synthesized with WebAudio.
 
-The current visual direction is an immersive overhead lake: blue-grey sky reflections, refracted ripples, shallow gravel, mineral-textured stones, wet edges, shoreline reeds and wooden floating lanterns. All materials are generated and cached in Canvas; no external assets are needed. The lake fills the screen. Progression, daily goals and atmosphere selection are tucked into the Collection drawer.
+The visual direction follows the supplied minimalist lake reference: natural teal water, intricate caustics, detailed shore rocks and mineral-textured stones. The lake fills the viewport. A small lake identifier/title sits left, **Collection** is centered above the lake, and daily/sound/pause controls sit right. The logo and tagline are absent. Collection opens directly on five level cards; Today, Keepsakes and Landscapes remain secondary tabs. The supported release target is the ten CrazyGames desktop frames, from 800×450 to 1920×1080, plus a 3840×2160 presentation; mobile is outside the current release scope.
 
-The four atmospheres are Morning lake, Evening light, After the rain, and Moonlit water. They change natural lighting instead of applying neon palettes.
+The six landscapes are Morning lake (woodland), Evening light (reed shallows), After the rain (rainforest pool), Moonlit water (rocky cove), Autumn glow (amber woodland), and Alpine dawn (mountain basin). Each has its own photographic-style lake plate and matching small journal preview. The water and stones are separate: the wave simulation, stone placement and level collision remain interactive. Image loading falls back to the original procedural scene if a local asset fails. The lake plates are packaged at 3840×2160 pixels; their generated source images were 1672×941 and were upscaled for export, so they do not contain native 4K source detail. At large display sizes, the static lake plate retains its full resolution while the animated canvas is capped at 2048×1152 for smoother play.
 
 ## Play and upload
 
@@ -34,29 +34,35 @@ In the CrazyGames submission, enable **Progress Save / Data Module**. Test the u
 
 ## How to play
 
-1. Tap open water to place a stone. All stones fall together when you press **DROP**.
+1. Click open water to place a stone. All stones fall together when you press **Drop stones**.
 2. Light every lantern. Overlapping positive wave heights add together; reflected waves count too.
-3. Before pond 15, tap a stone to remove it, or drag it to move it. From pond 15, tap a stone to cycle its delay through **0 / 1 / 2 seconds**; drag outside the pond to remove it.
-4. **RESET** clears the stones. Failed drops keep them, so you can adjust immediately. There are no lives, timers or attempt limits.
+3. Drag a stone to move it; right-click to remove it. Before lake 15, clicking a stone also removes it. From lake 15, clicking cycles its delay through **0 / 1 / 2 seconds**. Dragging outside the lake still removes it.
+4. **Reset** clears the stones. **Undo** restores your last placement, move, removal, timing change or reset (up to 30 edits in the current lake, while planning between drops). Failed drops keep the stones. There are no lives, timers or attempt limits.
 5. Use at most par stones for three stars, par + 1 for two, otherwise one. Beating par gets its own celebration.
 
 From pond 3, faint gold sanctuaries protect the water around lanterns. You cannot place stones inside them. This closes the obvious “drop directly on each lantern” shortcut. Reflections can still yield clever below-par solutions.
+
+Keyboard: Tab to the lake, use arrow keys to aim (Shift moves four cells), Enter to place or edit a stone, Delete/Backspace to remove it, Space to drop, Ctrl/Cmd Z to undo an edit, and 0 to center the camera. These shortcuts act while the lake is focused. Use the mouse wheel to zoom around the pointer; drag empty water to pan. Clicking empty water still places a stone, and dragging a stone still moves it. Collection's horizontal tabs support Left/Right, Home and End; Escape closes native dialogs. The **? Help** button explains the puzzle and exposes earned guidance; **How to play** shows three immediate steps, with keyboard and camera controls on request. Both pause the current puzzle. The Settings menu saves sound, lake ambience, calmer motion, clearer contrast and toolbar position. Turning off lake ambience keeps stone and lantern effects. Results keep keyboard focus within their choices, including the optional star bonus disclosure.
+
+Menus use a consistent dark teal lake palette, scenic imagery, editorial journal sections and clear focus states. Text scales with browser text settings. The UI respects reduced motion, reduced transparency and increased contrast where the browser exposes those preferences, with in-game motion and contrast overrides in Settings. Timing labels retain their proportions when the game frame changes. See the [CrazyGames menu research](docs/crazygames-menu-research.md) for the observed competitors and resulting choices, the [minimal UI redesign review](docs/minimal-ui-redesign.md) for palette and layout, and the [desktop design and retention review](docs/desktop-design-and-retention.md) for progression and research limitations.
 
 Ponds 1–10 are fixed and verified. Pond 3 introduces interference; two failed attempts on ponds 3–5 reveal faint launch rings. Rocks arrive on pond 7, larger puzzles on pond 10, optional timed stones on pond 15. Every fifth late pond includes a delayed stone in its certified solution.
 
 ## Progression
 
-- Four pond themes, unlocked at 0 / 10 / 20 / 30 stars, change the palette, stones and ambient chord.
-- Chapters contain five lakes. Finishing a chapter once awards three bonus stars and two hint credits. A compact chapter goal stays visible during play.
-- Best stone/drop records and a chapter-based level picker let players revisit unlocked lakes for three stars. Stars, chapter rewards and hint credits cannot be farmed by repeating a solve.
-- Each first solve earns one hint credit. Players begin with three. After two failed attempts, the Hint dialog offers a solution ring for one credit; after six failures, a player without credits can use free help.
-- The Daily Trail unlocks after lake 3: three lakes of increasing complexity (8/12/16), seeded by UTC date and stage. All players get identical geometry. Closing and reopening restores the active daily stage and placed stones. Each stage saves independently; finishing all three grows the streak and grants two credits once.
+- Six pond themes, unlocked at 0 / 10 / 20 / 30 / 60 / 120 stars, change water, banks, plants, stone material and ambient chord. Existing unlocks are preserved.
+- Chapters contain five lakes. Finishing a chapter once awards three bonus stars and two coins. Earning all 15 chapter stars awards another two coins once. Lantern progress and total stars remain in the small gameplay status pill.
+- Best stone/drop records and the Collection level cards let players revisit unlocked lakes for three stars. Stars, chapter rewards and coins cannot be farmed by repeating a solve. The next locked lake can be unlocked early for three coins after the first solve; completing the preceding lake always unlocks it for free. Only the immediate next lake can be bought, so a purchase never strands the player.
+- When a chapter has completed lakes below three stars, **Improve lake** recommends an unlocked lake closest to mastery. Players can return directly to their unlocked journey afterward.
+- Each first solve earns one coin. Players begin with three. After two failed attempts, the Hint dialog offers a solution ring for one coin; after four failed drops, free rings are available regardless of coins. After six, an optional guided layout places the certified solution so the player can watch and learn. Assistance keeps stars and progression.
+- The Daily Trail unlocks after lake 3: three lakes of increasing complexity (8/12/16), seeded by UTC date and stage. All players get identical geometry. Closing and reopening restores the active daily stage and placed stones. Each stage saves independently; finishing all three grows the streak and grants two coins once.
 - The daily share card reports up to 9 stars, total stones, and 3/3 lakes, with clipboard fallback. It contains no ad bonus stars.
+- Six permanent Collection keepsakes reward 5/10/30 journey completions, ten three-star lakes, and daily trails completed on 3/7 distinct days. Return days need not be consecutive. Rewards are automatic, saved, and cannot be collected twice. The result screen explains daily bonus stars and new atmosphere unlocks; it opens Collection directly. Collection can resume the highest unlocked lake.
 - Three daily goals with small bonuses; replaying a completed pond cannot repeatedly farm its stars or goals.
 - Local save in standalone mode. When the initialized CrazyGames SDK Data module is present, it becomes the save backend. Cloud data is read before writing; a late initialization reconciles earned progress.
 - Mid-level placement, delays, attempts and completed reward screens survive reloads.
 
-The first pond is the initial screen: no menu or logo barrier. A pulsing placement cue appears after five seconds. Chimes, particles, a brief zoom finish and the daily-unlock reveal follow the player's actual actions. The requested 0:15 / 0:45 / 1:30 milestones are pacing targets, not forced timers. Browser autoplay restrictions mean sound starts with the first user gesture.
+The first visit opens a short, optional introduction over the first lake. Choosing **Show me how** leads through placing a real stone and dropping it; players can skip at any time. The introduction stays completed after reload, and existing saved players are not interrupted. A placement cue appears after five seconds on an unfinished first lake; routine instructions stay in Help. Invalid actions and failed-drop feedback appear briefly above the toolbar. Chimes, particles, a brief zoom finish and the daily-unlock reveal follow the player's actual actions. The requested 0:15 / 0:45 / 1:30 milestones are pacing targets, not forced timers. Browser autoplay restrictions mean sound starts with the first user gesture.
 
 ## Simulation and generation
 
@@ -85,7 +91,7 @@ node tools/benchmark.mjs 30 48    # smaller/custom search
 node tools/script-levels.mjs     # rebuild fixed onboarding after intentional physics changes
 ```
 
-F3 toggles a debug overlay: level time, attempts, session drops, generation time, seed, step and lantern peaks versus threshold. F3 does not reveal a solution. The fixed 128² lake projects across the **entire canvas**, with independent horizontal/vertical scale. Consequently circles project as ellipses on rectangular screens, while solutions and timing remain identical. Stones and lantern sprites retain their proportions. There is no hidden central play square. **Controls ↑ / ↓** moves the tray so every covered water cell remains accessible. A win stops scoring, but water keeps simulating to 720 steps to let waves travel to the shoreline; those extra visual steps never count toward solving a failed attempt. The development-only `?test` harness is stripped by the build tool.
+F3 toggles a debug overlay: level time, attempts, session drops, generation time, seed, step and lantern peaks versus threshold. F3 does not reveal a solution. The fixed 128² lake projects across the **entire canvas**, with independent horizontal/vertical scale. Consequently circles project as ellipses on rectangular screens, while solutions and timing remain identical. Stones and lantern sprites retain their proportions. There is no hidden central play square. **Settings → Controls at the top** or the move button in How to play moves the tray so every covered water cell remains accessible. A win stops scoring, but water keeps simulating to 720 steps to let waves travel to the shoreline; those extra visual steps never count toward solving a failed attempt. The development-only `?test` harness is stripped by the build tool.
 
 ### Calibration
 
@@ -130,13 +136,16 @@ Tuning performed: threshold calibration; fixed, symmetric interference lessons o
 npm install --no-save --package-lock=false playwright@1.56.1
 npx playwright install --with-deps chromium
 npm run test:browser
+npm run test:ui
 ```
 
-GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, chapter rewards, failed attempts, earned hints, delays, pause/resume, three daily stages, active-mode/stage/stone restore on reload, sharing, replay anti-farming, all ten CrazyGames frame sizes plus three phone layouts, full-screen pointer mapping, 60/144 Hz peak equality, and mocked SDK/cloud/ad/mute behavior.
+GitHub Actions runs the same checks and uploads screenshots, the browser report and the upload ZIP as **ripple-validation-and-upload**. The script checks initial interaction, mid-level restore, all ten onboarding solutions, chapter rewards, failed attempts, earned hints, delays, pause/resume, three daily stages, active-mode/stage/stone restore on reload, sharing, replay anti-farming, all ten CrazyGames desktop frame sizes, full-screen pointer mapping, 60/144 Hz peak equality, and mocked SDK/cloud/ad/mute behavior.
 
-**Release validation:** 21 unit tests and all 16 Chromium browser check groups passed, with no browser errors. All ten required CrazyGames sizes plus three phone layouts passed. [Passing run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39792903212); exact tested commit and checks are in `reports/browser.json`. First contentful paint was 172 ms on this headless CI machine; this is not a universal phone/network guarantee. The Basic build is 98,515 bytes uncompressed / 32,847 bytes zipped.
+The separate UI suite checks keyboard play and timing edits, Undo and right-click removal, modal focus, bonus accessibility and one-time rewards, journal navigation, mastery recommendations, drag offset, all four journal sections at compact through Full HD desktop sizes, 200% text, safe areas, computed text contrast and accessibility preferences. It writes `reports/ui.json` and `reports/ui/` screenshots. In the managed workspace, use a disposable copy as described in [AGENTS.md](AGENTS.md) to keep generated reports and archives separate from source changes.
 
-Inspected screenshots: [desktop](docs/desktop.webp), [phone](docs/mobile.webp), [landscape](docs/landscape.webp), [full-lake ripple](docs/waves-fullscreen.webp). The in-chat copy has separate local saves and no SDK/ad requests.
+The current local validation runs unit, browser and UI checks in a disposable copy; the browser suite includes all ten CrazyGames desktop sizes and mocked SDK behavior. Earlier [passing CI run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39792903212) covers the previous release, before the new imagery, Collection and camera controls.
+
+Inspected screenshots of the current desktop release: [lake](docs/desktop.png) and [Collection](docs/collection.png). The standalone playtest has separate local saves and no SDK/ad requests.
 
 ## CrazyGames integration (official docs checked 22 October 2026)
 
@@ -153,6 +162,8 @@ Inspected screenshots: [desktop](docs/desktop.webp), [phone](docs/mobile.webp), 
 Read [docs/crazygames-release.md](docs/crazygames-release.md) for the portal test checklist and retention measurement plan. Passing repository tests does not mean CrazyGames approval or proven retention. Real ads, guest/account sync and device audio interruptions need the portal preview and physical-device testing.
 
 Official references: [SDK initialization](https://docs.crazygames.com/sdk/intro/), [game events/settings](https://docs.crazygames.com/sdk/game/), [video ads](https://docs.crazygames.com/sdk/video-ads/), [advertisement requirements](https://docs.crazygames.com/requirements/ads/), [Data](https://docs.crazygames.com/sdk/data/), [quality](https://docs.crazygames.com/requirements/quality/), [gameplay/responsive sizes](https://docs.crazygames.com/requirements/gameplay/), [puzzle monetization](https://docs.crazygames.com/resources/monetizing-puzzle/).
+
+See [the playtest and retention review](docs/playtest-and-retention.md) for the journal update, observed play sessions, difficulty sample, and remaining human validation.
 
 ## Implementation map
 

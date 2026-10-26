@@ -1,0 +1,26 @@
+# CrazyGames menu and settings research for Ripple
+
+Observed on 26 October 2026 in a 1440×900 Chromium window. The CrazyGames game area occupied roughly 984×510 pixels. I selected games visible on the CrazyGames home page and with substantial public like counts. Those counts and placement are imperfect popularity signals; CrazyGames does not publish comparable revenue, playtime or retention for these titles. The findings below describe the interfaces I opened and played, not a causal explanation of their popularity.
+
+| Game on CrazyGames | Visible public signal | Menu and settings observed |
+| --- | --- | --- |
+| [Space Waves](https://www.crazygames.com/game/space-waves) | About 5.1 million likes | A playable tutorial uses one short instruction and a visible **Skip tutorial** action. The mode menu gives three large mode choices. Its separate settings screen has only **Sound** and **Language**, plus an obvious back arrow. |
+| [8 Ball Billiards Classic](https://www.crazygames.com/game/8-ball-billiards-classic) | About 608,000 likes | **Play** dominates the opening screen; statistics and help are smaller actions. A gear sits at the top edge. Its settings screen offers a small cluster of audio and gameplay controls, and a home action. |
+| [Words of Wonders](https://www.crazygames.com/game/words-of-wonders) | About 434,000 likes | The first run asks for a language, then moves straight to the puzzle. The in-game gear opens a compact panel with a title, the current level, home, sound and music controls, and close. |
+| [Mahjongg Solitaire](https://www.crazygames.com/game/mahjongg-solitaire) | About 153,000 likes | The game starts from one prominent Play button. During play, a gear opens a small pause panel with sound, restart and exit controls, followed by a prominent **Continue** action. |
+
+These games use their own art direction. Most of their settings rely on large icons with little or no explanation; that economy of text is useful, but some icon meanings are ambiguous. Their menus also run inside a CrazyGames frame, so a settings panel cannot assume the full browser viewport. Since several games render text into Canvas or Unity, their exact CSS font sizes are unavailable; I did not infer precise pixel measurements from screenshots.
+
+I also opened [Smash Karts](https://www.crazygames.com/game/smash-karts), which showed about 1.7 million likes, but its game stopped at the loading screen when a required external service failed in this environment. Its menu is therefore excluded from the observations above.
+
+## What Ripple adopts
+
+The repeated structure is more useful than any individual skin: one obvious action to continue, a separate and compact settings route, a small number of immediately understandable choices, and short help that does not interrupt play. Ripple's pause screen gives **Resume** first, then **Collection**, **Settings** and **How to play**. Collection also has its own centered button above the lake and opens directly on the level cards. The settings panel uses five one-line choices under **Audio**, **Display** and **Controls**, rather than a long list of descriptions. The header names the current lake, so the player retains context. Sound and lake ambience can be set independently; the latter controls water and soft background tones while stone and lantern effects remain audible. Changes save immediately.
+
+The How to play panel first shows three actions — place, adjust, drop. Keyboard shortcuts and later mechanics sit in a disclosure that players can open when needed. The existing first-run playable guide stays skippable. At Ripple's base text size, settings labels are 16 CSS px, group labels 11 CSS px, secondary labels 13 CSS px, and the large dialog title is roughly 31–43 CSS px depending on viewport. Settings rows are at least 55 CSS px high and important buttons at least 44 CSS px. Shorter desktop frames scroll the body while keeping the close and Done actions reachable; browser text enlargement remains supported.
+
+Ripple keeps calmer motion, clearer contrast and toolbar position because they solve real accessibility and lake-visibility needs. It does not add a language switch without translated content or a graphics-quality switch without meaningful render modes. This follows [Apple HIG Settings › Best practices](../.agents/skills/apple-design/references/hig/settings.md): “Minimize the number of settings you offer”, and [Writing › Keep settings labels clear and simple](../.agents/skills/apple-design/references/hig/writing.md): explain only what a label cannot. [Designing for games › Teach through play](../.agents/skills/apple-design/references/hig/designing-for-games.md) supports the playable first-run guide. These are design principles applied to a web game, not native Apple navigation rules.
+
+## What remains unproven
+
+Public likes are not session-length or retention data. The menu changes are a usability hypothesis until tested with new players in the CrazyGames frame. The useful checks are time to first drop, guide skip rate, settings use, exits from pause, and whether players resume the lake they intended. A short uncoached study should ask players to mute ambience but keep stone effects, find a previous lake, resume after pausing, and locate keyboard controls without prompting.

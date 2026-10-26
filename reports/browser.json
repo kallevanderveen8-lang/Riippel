@@ -1,26 +1,27 @@
 {
   "passed": true,
-  "firstContentfulPaintMs": 172,
+  "firstContentfulPaintMs": 208,
   "checks": [
     "initial interactive pond, SDK blocked",
     "pointer placement and mid-level restore",
+    "second pointer cannot steal a drag; pause rolls back and saves the original stone",
     "first pond solve, stars and full-screen wave continuation",
     "all ten scripted ponds completable; chapter rewards",
+    "result opens journal; chapter mastery, six atmospheres and keepsakes survive reload",
     "failed drop preserves stones and permits retry",
     "earned hint dialog pauses and consumes exactly one token",
+    "free hints after four failures with credits remaining; guided layout after six saves and solves",
     "frame loop survives asynchronous procedural level loading",
     "delayed stone tap",
     "pause and resume",
     "collection drawer opens and resumes play",
     "three-stage UTC daily trail, reload restores mode/stage/stones, streak, clipboard share",
     "replay keeps best stars without farming rewards",
-    "full-screen lake and 48px controls at all 10 CrazyGames sizes + 3 phone layouts",
+    "full-screen lake and 48px Drop control at all 10 CrazyGames desktop sizes",
     "placement beyond old square; controls can move to expose covered water",
+    "journal resumes highest unlocked lake, preserves active placements, and works at 800×450",
     "60 / 144 Hz identical peak hash",
     "SDK cloud-first restore, portal mute, Basic ad suppression, request/input shield and unfilled recovery"
   ],
-  "errors": [],
-  "testedCommit": "347600ec7468e48cec6a765f28ecaddd70f534bb",
-  "workflowRun": "https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39792903212",
-  "unitTestsPassed": 21
+  "errors": []
 }

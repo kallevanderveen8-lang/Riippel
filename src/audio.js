@@ -1,19 +1,19 @@
 import { C } from './config.js';
 export class Sound {
-  constructor() { this.muted = false; this.paused = false; this.theme = C.themes[0]; this.nodes = []; }
+  constructor() { this.muted = false; this.paused = false; this.ambientEnabled = true; this.theme = C.themes[0]; this.nodes = []; }
   async unlock() {
     if (!this.ctx) {
       const Audio = window.AudioContext || window.webkitAudioContext; if (!Audio) return;
       this.ctx = new Audio(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination); this.master.gain.value = C.audio.master;
-      this.pad = this.ctx.createGain(); this.pad.gain.value = C.audio.ambient; this.pad.connect(this.master); this.makeWater(); this.setTheme(this.theme);
+      this.pad = this.ctx.createGain(); this.pad.gain.value = 0; this.pad.connect(this.master); this.makeWater(); this.setTheme(this.theme);
     }
     if (['suspended', 'interrupted'].includes(this.ctx.state)) await this.ctx.resume().catch(() => {}); this.sync();
   }
   setTheme(theme) {
     this.theme = theme; if (!this.ctx) return;
     this.nodes.forEach(n => n.stop()); this.nodes = [];
-    this.pad.gain.value = C.audio.ambient * .32;
     theme.notes.forEach((f, i) => { const o = this.ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f / 2; o.detune.value = i * 3; o.connect(this.pad); o.start(); this.nodes.push(o); });
+    this.sync();
   }
   makeWater() {
     const length = this.ctx.sampleRate * C.audio.waterLoopSeconds, buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate), data = buffer.getChannelData(0);
@@ -21,10 +21,15 @@ export class Sound {
     for (let i = 0; i < length; i++) { smooth = (smooth + (Math.random() * 2 - 1) * .022) / 1.022; data[i] = smooth * 3; }
     this.waterBuffer = buffer;
     const source = this.ctx.createBufferSource(), filter = this.ctx.createBiquadFilter(), gain = this.ctx.createGain();
-    source.buffer = buffer; source.loop = true; filter.type = 'lowpass'; filter.frequency.value = C.audio.waterLowpass; gain.gain.value = C.audio.waterBed;
-    source.connect(filter); filter.connect(gain); gain.connect(this.master); source.start(); this.water = source;
+    source.buffer = buffer; source.loop = true; filter.type = 'lowpass'; filter.frequency.value = C.audio.waterLowpass; gain.gain.value = 0;
+    source.connect(filter); filter.connect(gain); gain.connect(this.master); source.start(); this.water = source; this.waterGain = gain;
   }
-  sync() { if (this.ctx) this.master.gain.setTargetAtTime(this.muted || this.portalMuted || this.paused ? 0 : C.audio.master, this.ctx.currentTime, .03); }
+  sync() {
+    if (!this.ctx) return;
+    this.master.gain.setTargetAtTime(this.muted || this.portalMuted || this.paused ? 0 : C.audio.master, this.ctx.currentTime, .03);
+    this.pad.gain.setTargetAtTime(this.ambientEnabled ? C.audio.ambient * .32 : 0, this.ctx.currentTime, .03);
+    this.waterGain.gain.setTargetAtTime(this.ambientEnabled ? C.audio.waterBed : 0, this.ctx.currentTime, .03);
+  }
   tone(freq, duration, gain, type = 'sine') {
     if (!this.ctx || this.muted || this.portalMuted || this.paused) return;
     const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();

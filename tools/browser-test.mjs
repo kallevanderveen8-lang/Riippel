@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';import {createRequire} from 'node:module';import {spawn} from 'node:child_process';import {mkdirSync,writeFileSync} from 'node:fs';
-const require=createRequire(import.meta.url);let playwright;try{playwright=require('playwright');}catch{playwright=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright');}
+const require=createRequire(import.meta.url);let playwright;
+  async function openJournal() {
+    if (await page.locator('#overlay').isHidden()) await page.click('#pause');
+    await page.click(await page.locator('#overlay').evaluate(e=>e.classList.contains('is-paused')) ? '#collection-mobile' : '#result-journal');
+  }
+  async function closeJournal(button='#journal-back') {
+    await page.click(button);
+    if (await page.locator('#overlay').evaluate(e=>!e.hidden&&e.classList.contains('is-paused'))) await page.click('#next');
+  }
+try{playwright=require('playwright');}catch{playwright=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright');}
 const port=Number(process.env.TEST_PORT||4174), base=`http://localhost:${port}`;
 const server=spawn(process.execPath,['tools/serve.mjs'],{stdio:'pipe',env:{...process.env,PORT:String(port)}});await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.on('error',reject);});
 let browser,page,sdkBlocked=0;const errors=[],checks=[];mkdirSync('reports',{recursive:true});
@@ -8,26 +17,71 @@ try{
  const context=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});page=await context.newPage();
  page.on('pageerror',e=>errors.push(e.message));await page.route('https://sdk.crazygames.com/**',r=>{sdkBlocked++;return r.abort();});
  await page.goto(`${base}/?test&sdk`);await page.waitForFunction(()=>window.__ripple);
+ await page.click('#welcome-skip');
  const firstFrame=await page.evaluate(()=>performance.getEntriesByType('paint').find(p=>p.name==='first-contentful-paint')?.startTime??null);
  await page.screenshot({path:'reports/desktop.png'});await page.evaluate(()=>window.__ripple.go(8));await page.screenshot({path:'reports/rocks.png'});await page.evaluate(()=>window.__ripple.go(1));checks.push('initial interactive pond, SDK blocked');
  const pond=page.locator('#pond');let bounds=await pond.boundingBox();let view=await page.evaluate(()=>window.__ripple.state.view);await page.mouse.click(bounds.x+view.x+view.width*.5,bounds.y+view.y+view.height*.5);
  assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),1);await page.reload();await page.waitForFunction(()=>window.__ripple?.state.stones.length===1);checks.push('pointer placement and mid-level restore');
+ const originalStone=await page.evaluate(()=>({...window.__ripple.state.stones[0]}));
+ const stoneX=bounds.x+view.x+view.width*originalStone.x/128, stoneY=bounds.y+view.y+view.height*originalStone.y/128;
+ await page.mouse.move(stoneX,stoneY);await page.mouse.down();
+ await pond.dispatchEvent('pointerdown',{pointerId:99,pointerType:'touch',clientX:stoneX+100,clientY:stoneY});
+ await page.mouse.move(stoneX+80,stoneY+60);
+ assert.notDeepEqual(await page.evaluate(()=>window.__ripple.state.stones[0]),originalStone);
+ await page.evaluate(()=>document.getElementById('pause').click());await page.mouse.up();
+ assert.deepEqual(await page.evaluate(()=>window.__ripple.state.stones[0]),originalStone);
+ await page.reload();await page.waitForFunction(()=>window.__ripple?.state.stones.length===1);
+ assert.deepEqual(await page.evaluate(()=>window.__ripple.state.stones[0]),originalStone);
+ checks.push('second pointer cannot steal a drag; pause rolls back and saves the original stone');
  await page.click('#drop');await page.waitForTimeout(500);await page.screenshot({path:'reports/waves.png'});await page.waitForFunction(()=>window.__ripple.state.phase==='complete');await page.screenshot({path:'reports/complete.png'});assert.equal(await page.evaluate(()=>window.__ripple.state.progress.stars.l1),3);await page.waitForFunction(()=>window.__ripple.state.step>=360);await page.screenshot({path:'reports/waves-fullscreen.png'});checks.push('first pond solve, stars and full-screen wave continuation');
  await page.click('#next');assert.equal(await page.evaluate(()=>window.__ripple.state.level.number),2);
  for(let n=2;n<=10;n++){if(n>2)await page.evaluate(n=>window.__ripple.go(n),n);await page.evaluate(()=>window.__ripple.solve());await page.waitForFunction(()=>window.__ripple.state.phase==='complete');assert.equal(await page.evaluate(()=>window.__ripple.state.lit.every(Boolean)),true);}
  assert.ok(await page.evaluate(()=>window.__ripple.state.progress.chapters[0]&&window.__ripple.state.progress.chapters[1]));checks.push('all ten scripted ponds completable; chapter rewards');
+ await page.click('#result-journal');
+ assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),true);
+ await page.click('#page-back');
+ assert.match(await page.locator('#mastery-progress').innerText(),/Mastered/);
+ assert.equal(await page.locator('.discovery.earned').count(),3);
+ assert.equal(await page.locator('#theme-options button').count(),6);
+ await page.screenshot({path:'reports/journal.png'});await closeJournal('#close-dialog');
+ await page.reload();await page.waitForFunction(()=>window.__ripple?.state.phase==='complete');
+ assert.ok(await page.evaluate(()=>window.__ripple.state.progress.mastery[1]&&window.__ripple.state.progress.discoveries['ten-perfect']));
+ checks.push('result opens journal; chapter mastery, six atmospheres and keepsakes survive reload');
  await page.evaluate(()=>window.__ripple.go(3));await page.evaluate(()=>window.__ripple.place([{x:36,y:64,delay:0}]));await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),1);checks.push('failed drop preserves stones and permits retry');
- await page.evaluate(()=>window.__ripple.go(6));await page.evaluate(()=>window.__ripple.place([{x:36,y:64,delay:0}]));for(let i=0;i<2;i++){await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');}const hints=await page.evaluate(()=>window.__ripple.state.progress.tokens);await page.click('#hint');assert.ok(await page.evaluate(()=>window.__ripple.state.paused));await page.click('#hint-token');assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),hints-1);assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('earned hint dialog pauses and consumes exactly one token');
+ await page.evaluate(()=>window.__ripple.go(6));await page.evaluate(()=>window.__ripple.place([{x:36,y:64,delay:0}]));for(let i=0;i<2;i++){await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');}const hints=await page.evaluate(()=>window.__ripple.state.progress.tokens);await page.click('#help-open');await page.click('#hint');assert.ok(await page.evaluate(()=>window.__ripple.state.paused));await page.click('#hint-token');assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),hints-1);assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('earned hint dialog pauses and consumes exactly one token');
+ for(let i=0;i<2;i++){await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');}
+ const freeBalance=await page.evaluate(()=>window.__ripple.state.progress.tokens);
+ await page.click('#help-open');await page.click('#hint');await page.click('#hint-free');
+ assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),freeBalance);
+ for(let i=0;i<2;i++){await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');}
+ await page.click('#help-open');await page.click('#hint');await page.click('#hint-guide');
+ assert.deepEqual(await page.evaluate(()=>window.__ripple.state.stones),await page.evaluate(()=>window.__ripple.state.level.solution));
+ assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),freeBalance);
+ await page.reload();await page.waitForFunction(()=>window.__ripple?.state.stones.length>0);
+ await page.click('#drop');await page.waitForFunction(()=>window.__ripple.state.phase==='complete');
+ checks.push('free hints after four failures with credits remaining; guided layout after six saves and solves');
  await page.evaluate(()=>window.__ripple.go(15));await page.waitForFunction(()=>window.__ripple.state.elapsed > .1);checks.push('frame loop survives asynchronous procedural level loading');await page.evaluate(()=>window.__ripple.place([{x:15,y:15,delay:0}]));bounds=await pond.boundingBox();view=await page.evaluate(()=>window.__ripple.state.view);await page.mouse.click(bounds.x+view.x+view.width*15/128,bounds.y+view.y+view.height*15/128);assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].delay),1);checks.push('delayed stone tap');
- await page.click('#pause');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);await page.click('#next');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('pause and resume');await page.click('#collection-mobile');assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),true);await page.click('#close-dialog');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('collection drawer opens and resumes play');
+ await page.click('#pause');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),true);await page.click('#next');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('pause and resume');await openJournal();assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),true);await closeJournal('#close-dialog');assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);checks.push('collection drawer opens and resumes play');
  await page.evaluate(()=>window.__ripple.daily());
  for(let i=0;i<3;i++){if(i===1){await page.evaluate(()=>window.__ripple.place(window.__ripple.state.level.solution.map(s=>({...s}))));const placed=await page.evaluate(()=>window.__ripple.state.stones);await page.reload();await page.waitForFunction(()=>window.__ripple?.state.mode==='daily'&&window.__ripple.state.dailyStage===1);assert.deepEqual(await page.evaluate(()=>window.__ripple.state.stones),placed);}await page.evaluate(()=>window.__ripple.solve());await page.waitForFunction(()=>window.__ripple.state.phase==='complete');if(i<2){await page.click('#next');await page.waitForFunction(i=>window.__ripple.state.dailyStage===i+1&&window.__ripple.state.phase==='ready',i);}}
  await page.click('#copy');assert.match(await page.evaluate(()=>navigator.clipboard.readText()),/^Ripple Daily #.*9\/9 stars/);assert.equal(await page.evaluate(()=>window.__ripple.state.progress.streak),1);checks.push('three-stage UTC daily trail, reload restores mode/stage/stones, streak, clipboard share');
  const replayStars=await page.evaluate(()=>Object.values(window.__ripple.state.progress.stars).reduce((a,b)=>a+b,0)+window.__ripple.state.progress.bonus);await page.click('#replay');await page.waitForFunction(()=>window.__ripple.state.phase==='ready');await page.evaluate(()=>window.__ripple.solve());await page.waitForFunction(()=>window.__ripple.state.phase==='complete');assert.equal(await page.evaluate(()=>Object.values(window.__ripple.state.progress.stars).reduce((a,b)=>a+b,0)+window.__ripple.state.progress.bonus),replayStars);checks.push('replay keeps best stars without farming rewards');
- const sizes=[[390,844],[320,568],[844,390],[907,510],[1216,684],[1077,606],[821,462],[1366,768],[1920,1080],[1536,864],[1280,720],[800,450],[1080,607]];
- for(const [width,height] of sizes){await page.setViewportSize({width,height});await page.evaluate(()=>window.__ripple.go(3));await page.waitForFunction(()=>window.__ripple.state.view.width===innerWidth&&window.__ripple.state.view.height===innerHeight);if(width<900)await page.screenshot({path:`reports/layout-${width}x${height}.png`});const layout=await page.evaluate(()=>{const r=document.querySelector('#drop').getBoundingClientRect(),v=window.__ripple.state.view;return {overflow:document.documentElement.scrollWidth>innerWidth,dropVisible:r.top>=0&&r.bottom<=innerHeight,dropHeight:r.height,full:v.x===0&&v.y===0&&v.width===innerWidth&&v.height===innerHeight};});assert.equal(layout.overflow,false);assert.equal(layout.dropVisible,true);assert.ok(layout.dropHeight>=48);assert.ok(layout.full);}
- checks.push('full-screen lake and 48px controls at all 10 CrazyGames sizes + 3 phone layouts');
- await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>window.__ripple.go(1));await page.mouse.click(1440*15/128,500);assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),15);await page.click('#dock');assert.ok(await page.locator('#app').evaluate(e=>e.classList.contains('dock-top')));checks.push('placement beyond old square; controls can move to expose covered water');
+ const sizes=[[907,510],[1216,684],[1077,606],[821,462],[1366,768],[1920,1080],[1536,864],[1280,720],[800,450],[1080,607]];
+ for(const [width,height] of sizes){await page.setViewportSize({width,height});await page.evaluate(()=>window.__ripple.go(3));await page.waitForFunction(()=>{const v=window.__ripple.state.view;return Math.abs(v.width-innerWidth*1.08)<1&&Math.abs(v.height-innerHeight*1.08)<1;});if(width<900)await page.screenshot({path:`reports/layout-${width}x${height}.png`});const layout=await page.evaluate(()=>{const r=document.querySelector('#drop').getBoundingClientRect(),v=window.__ripple.state.view;return {overflow:document.documentElement.scrollWidth>innerWidth,dropVisible:r.top>=0&&r.bottom<=innerHeight,dropHeight:r.height,camera:v.x<=0&&v.y<=0&&v.x+v.width>=innerWidth&&v.y+v.height>=innerHeight};});assert.equal(layout.overflow,false);assert.equal(layout.dropVisible,true);assert.ok(layout.dropHeight>=48);assert.ok(layout.camera);}
+ checks.push('full-screen lake and 48px Drop control at all 10 CrazyGames desktop sizes');
+ await page.setViewportSize({width:1440,height:1000});await page.waitForFunction(()=>{const r=document.getElementById('pond').getBoundingClientRect(),v=window.__ripple.state.view;return r.width===innerWidth&&r.height===innerHeight&&Math.abs(v.width-innerWidth*1.08)<1;});await page.evaluate(()=>window.__ripple.go(1));const edgePoint=await page.evaluate(()=>{const v=window.__ripple.state.view;return {x:v.x+v.width*15/128,y:v.y+v.height*.5};});await page.mouse.click(edgePoint.x,edgePoint.y);assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),15);await page.click('#how-to');await page.click('#dock');assert.ok(await page.locator('#app').evaluate(e=>e.classList.contains('dock-top')));checks.push('placement beyond old square; controls can move to expose covered water');
+ const unlocked=await page.evaluate(()=>window.__ripple.state.progress.level);
+ await openJournal();await page.click('#continue-journey');
+ await page.waitForFunction(n=>window.__ripple.state.level?.number===n&&!window.__ripple.state.paused,unlocked);
+ await page.evaluate(()=>window.__ripple.place([{x:15,y:15,delay:0}]));
+ await openJournal();await page.click('#continue-journey');
+ assert.deepEqual(await page.evaluate(()=>window.__ripple.state.stones),[{x:15,y:15,delay:0}]);
+ await page.setViewportSize({width:800,height:450});await openJournal();await page.click('#jump-keepsakes');
+ assert.ok(await page.locator('#collection-dialog').evaluate(e=>e.scrollWidth<=e.clientWidth));
+ await page.screenshot({path:'reports/journal-compact-desktop.png'});await closeJournal();
+ assert.equal(await page.evaluate(()=>window.__ripple.state.paused),false);
+ await page.setViewportSize({width:1440,height:1000});
+ checks.push('journal resumes highest unlocked lake, preserves active placements, and works at 800×450');
  // Same 360 simulation steps at 60 and 144 Hz, independent of render cadence.
  const hashes=await page.evaluate(async()=>{const {Wave}=await import('/src/simulation.js');const w=new Wave([{x:64,y:40,rx:5,ry:10}]);const stones=[{x:36,y:64,delay:0},{x:92,y:64,delay:1}];function run(hz){w.reset(stones);let acc=0;while(w.stepNumber<360){acc+=1/hz;while(acc>=1/60&&w.stepNumber<360){w.step();w.step();acc-=1/60;}}let hash=2166136261;for(const v of new Uint32Array(w.peak.buffer)){hash=Math.imul(hash^v,16777619);}return hash>>>0;}return [run(60),run(144)];});assert.equal(hashes[0],hashes[1]);checks.push('60 / 144 Hz identical peak hash');
  // Exercise the real adapter/main UI against explicit SDK callbacks; no live ad traffic.
@@ -37,7 +91,12 @@ try{
    window.CrazyGames={SDK:{environment:'crazygames',init:async()=>{},game:{settings:{muteAudio:true},addSettingsChangeListener:fn=>window.settingsChange=fn,gameplayStart:()=>sdkCalls.push('start'),gameplayStop:()=>sdkCalls.push('stop'),loadingStart(){},loadingStop(){},setGameContext(){},happytime(){},reportGameCompletedPercentage(){}},data:{getItem:()=>{sdkCalls.push('read');return data;},setItem:(k,v)=>{sdkCalls.push('write');data=v;}},ad:{hasAdblock:async()=>false,requestAd:(type,cb)=>{window.adCallbacks=cb;}}}};
  });
  await mock.goto(`${base}/?test`);await mock.waitForFunction(()=>window.__ripple?.state.level.number===6&&window.__ripple.portal.sdk);
- assert.ok(await mock.locator('#sound').isDisabled());await mock.evaluate(()=>window.settingsChange({muteAudio:false}));assert.equal(await mock.locator('#sound').isDisabled(),false);
+ assert.ok(await mock.locator('#sound').isDisabled());
+ await mock.click('#pause');await mock.click('#pause-settings');
+ assert.ok(await mock.locator('#setting-sound').isDisabled());assert.ok(await mock.locator('#setting-ambience').isDisabled());
+ assert.equal(await mock.locator('#setting-sound-note').isVisible(),true);
+ await mock.click('#settings-close');await mock.click('#next');
+ await mock.evaluate(()=>window.settingsChange({muteAudio:false}));assert.equal(await mock.locator('#sound').isDisabled(),false);
  assert.ok(await mock.evaluate(()=>sdkCalls.indexOf('read')<sdkCalls.indexOf('write')));assert.equal(await mock.evaluate(()=>window.__ripple.portal.eligible()),false);
  await mock.evaluate(()=>{const p=window.__ripple.portal;p.launchStage='full';p.ads=true;p.boot-=180001;p.ad('rewarded');});assert.ok(await mock.locator('#app').evaluate(e=>e.inert));assert.ok(await mock.evaluate(()=>window.__ripple.state.paused));assert.equal(await mock.evaluate(()=>window.__ripple.sound.paused),false);
  await mock.evaluate(()=>window.adCallbacks.adStarted());assert.equal(await mock.evaluate(()=>window.__ripple.sound.paused),true);

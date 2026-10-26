@@ -6,113 +6,270 @@ const mix = (a, b, t) => a + (b - a) * t;
 function hash(x, y, seed = 17) { let n = Math.imul(x, 374761393) + Math.imul(y, 668265263) + seed; n = Math.imul(n ^ n >>> 13, 1274126177); return ((n ^ n >>> 16) >>> 0) / 4294967296; }
 function noise(x, y, seed = 17) { const ix = Math.floor(x), iy = Math.floor(y); let u = x - ix, v = y - iy; u = u * u * (3 - 2 * u); v = v * v * (3 - 2 * v); return mix(mix(hash(ix, iy, seed), hash(ix + 1, iy, seed), u), mix(hash(ix, iy + 1, seed), hash(ix + 1, iy + 1, seed), u), v); }
 function fbm(x, y, seed = 17) { return noise(x, y, seed) * .55 + noise(x * 2, y * 2, seed + 5) * .27 + noise(x * 4, y * 4, seed + 11) * .12 + noise(x * 8, y * 8, seed + 23) * .06; }
+function causticEdge(x, y, seed) {
+  const ix = Math.floor(x), iy = Math.floor(y); let first = 10, second = 10;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const px = ix + dx + hash(ix + dx, iy + dy, seed), py = iy + dy + hash(ix + dx, iy + dy, seed + 39);
+    const distance = (x - px) ** 2 + (y - py) ** 2;
+    if (distance < first) { second = first; first = distance; } else if (distance < second) second = distance;
+  }
+  return Math.max(0, 1 - (Math.sqrt(second) - Math.sqrt(first)) / .075) ** 2;
+}
 function surface(w, h = w) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 
-// Each stone is a shaded, irregular mineral surface, generated once and cached.
-// No bitmaps, fonts or other visual assets are downloaded.
-function stoneTexture(seed, size) {
+// Keep the generated mineral texture as a fallback if bundled art cannot load.
+function stoneTexture(seed, size, color) {
   const canvas = surface(size), ctx = canvas.getContext('2d'), image = ctx.createImageData(size, size), d = image.data;
-  const warm = (seed % 5) * 3, angle = seed * .71, ca = Math.cos(angle), sa = Math.sin(angle);
+  const tone = color.match(/\w\w/g).map(c => parseInt(c, 16));
+  const angle = seed * .71, ca = Math.cos(angle), sa = Math.sin(angle);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const px = (x / size - .5) * 2.15, py = (y / size - .5) * 2.15;
+    const px = (x / size - .5) * 2.32, py = (y / size - .5) * 2.32;
     const nx = px * ca - py * sa, ny = px * sa + py * ca;
-    const grain = fbm(x / size * 12, y / size * 12, seed), edge = 1 + (noise(px * 3 + 9, py * 3 + 9, seed) - .5) * .23;
-    const r2 = (nx * nx + ny * ny * 1.16) / (edge * edge), p = (y * size + x) * 4;
+    const theta = Math.atan2(ny, nx);
+    const edge = .95 + Math.sin(theta * 3 + seed) * .055 + Math.cos(theta * 5 + seed * .3) * .035;
+    const r2 = (nx * nx + ny * ny * (1.05 + seed % 3 * .07)) / (edge * edge), p = (y * size + x) * 4;
     if (r2 > 1.02) continue;
-    const z = Math.sqrt(Math.max(0, 1 - r2)), light = clamp(-px * .36 - py * .43 + z * .77, .08, 1);
-    const fleck = hash(x, y, seed) - .5, mineral = grain * 22 + fleck * 18;
-    const seam = Math.abs(fbm(x / size * 4, y / size * 4, seed + 63) - .48);
-    const vein = seam < .012 ? 12 * (1 - seam / .012) : 0;
-    const wet = r2 > .72 ? .76 + .24 * (1 - r2) / .28 : 1;
-    d[p] = ((57 + warm) * (.62 + light) + mineral + vein) * wet;
-    d[p + 1] = ((61 + warm * .7) * (.62 + light) + mineral + vein) * wet;
-    d[p + 2] = ((60 + warm * .3) * (.62 + light) + mineral + vein) * wet;
-    d[p + 3] = clamp((1.02 - r2) * size / 3) * 255;
+    const grain = fbm(nx * 7 + 12, ny * 7 + 12, seed), fleck = hash(x, y, seed);
+    const z = Math.pow(Math.max(0, 1 - r2), .6);
+    const facet = noise(nx * 5 + 12, ny * 6 + 13, seed + 121);
+    const light = clamp(-px * .32 - py * .48 + z * .72 + (facet - .5) * .36);
+    const mineral = (grain - .5) * 55 + (fleck - .5) * 14;
+    const seam = Math.abs(ny + nx * .35 + (noise(nx * 3 + 10, ny * 3 + 10, seed) - .5) * .4 + .16);
+    const vein = Math.max(0, 1 - seam / .027) * (13 + grain * 15);
+    const quartz = clamp((noise(nx * 8 + 17, ny * 9 + 12, seed + 31) - .54) * 5) * 28;
+    const wet = 1 - clamp((r2 - .58) / .42) * .28;
+    // Broad diffuse light, a restrained wet glint and tiny quartz inclusions.
+    const specular = Math.pow(clamp(-px * .38 - py * .53 + z * .75), 24) * 21;
+    for (let c = 0; c < 3; c++) d[p + c] = (tone[c] * (.43 + light * .72) + mineral + vein + quartz) * wet + specular + (fleck > .97 ? light * 19 : 0);
+    d[p + 3] = clamp((1.02 - r2) * size / 2) * 255;
   }
   ctx.putImageData(image, 0, 0); return canvas;
 }
+const rockCache = new Map();
+const artURL = path => globalThis.__RIPPLE_ASSETS__?.[path] || path;
+const lakeImages = new Map();
+function lakeImage(theme) {
+  if (!lakeImages.has(theme.art)) {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = artURL(theme.art);
+    lakeImages.set(theme.art, image);
+  }
+  const image = lakeImages.get(theme.art);
+  return image.complete && image.naturalWidth ? image : null;
+}
+const atlas = new Image();
+let artVersion = 0;
+atlas.onload = () => { rockCache.clear(); artVersion++; };
+atlas.src = artURL('assets/stone-atlas.webp');
+const boulder = new Image();
+boulder.src = artURL('assets/boulder.webp');
+function rocksFor(theme) {
+  if (!rockCache.has(theme.stone)) rockCache.set(theme.stone, Array.from({ length: C.render.stoneVariants }, (_, i) => {
+    if (!atlas.complete || !atlas.naturalWidth) return stoneTexture(71 + i * 29, C.render.stoneTexture, theme.stone);
+    const side = atlas.height, canvas = surface(512), ctx = canvas.getContext('2d');
+    ctx.translate(256, 256); ctx.rotate((i % 3 - 1) * .11);
+    ctx.drawImage(atlas, (i % 3) * side, 0, side, side, -248, -248, 496, 496);
+    return canvas;
+  }));
+  return rockCache.get(theme.stone);
+}
 
 export class Renderer {
-  constructor(canvas) {
-    this.canvas = canvas; this.ctx = canvas.getContext('2d', { alpha: false });
-    this.off = surface(1); this.octx = this.off.getContext('2d', { alpha: false });
-    this.theme = C.themes[0]; this.bursts = []; this.zoom = 0; this.cachedTheme = null;
-    this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.rocks = Array.from({ length: C.render.stoneVariants }, (_, i) => stoneTexture(71 + i * 29, C.render.stoneTexture));
+  constructor(canvas, { theme = C.themes[0], preview = false } = {}) {
+    this.canvas = canvas; this.ctx = canvas.getContext('2d');
+    this.off = surface(1); this.octx = this.off.getContext('2d');
+    this.theme = theme; this.preview = preview; this.bursts = []; this.zoom = 0; this.cachedTheme = null; this.thumbnails = new Map();
+    const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+    this.motionPreference = motionPreference; this.userReduced = false;
+    this.reduced = preview || motionPreference.matches;
+    if (!preview) motionPreference.addEventListener('change',event=>{ this.reduced=this.userReduced || event.matches; });
     this.sines = Float32Array.from({ length: 2048 }, (_, i) => Math.sin(i / 2048 * Math.PI * 2));
+    this.cameraScale = preview ? 1 : 1.08;
     this.view = { x: 0, y: 0, size: 1 };
     this.normalX = new Float32Array(C.size * C.size); this.normalY = new Float32Array(C.size * C.size);
-    new ResizeObserver(() => this.resize()).observe(canvas); this.resize();
+    if (!preview) new ResizeObserver(() => this.resize()).observe(canvas);
+    this.resize();
   }
   resize() {
-    const rect = this.canvas.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, C.render.dpr);
+    const rect = this.preview ? this.canvas : this.canvas.getBoundingClientRect(), dpr = this.preview ? 1 : Math.min(devicePixelRatio || 1, C.render.dpr, 2048 / rect.width, 1152 / rect.height);
     if (!rect.width || !rect.height) return;
+    const oldWidth = this.width, oldHeight = this.height;
+    const centerX = this.view.width ? (oldWidth / 2 - this.view.x) / this.view.width : .5;
+    const centerY = this.view.height ? (oldHeight / 2 - this.view.y) / this.view.height : .5;
     this.width = rect.width; this.height = rect.height; this.dpr = dpr;
     this.canvas.width = Math.round(rect.width * dpr); this.canvas.height = Math.round(rect.height * dpr);
-    // One deterministic 128² physical lake covers the complete viewport.
-    // Resize changes only the projection, never the level or its wave solution.
-    this.view = { x: 0, y: 0, width: rect.width, height: rect.height, size: Math.min(rect.width, rect.height) };
+    // Camera movement changes only the projection, never the physical puzzle.
+    this.view = { x: rect.width * (.5 - centerX * this.cameraScale), y: rect.height * (.5 - centerY * this.cameraScale), width: rect.width * this.cameraScale, height: rect.height * this.cameraScale, size: Math.min(rect.width, rect.height) * this.cameraScale };
+    this.clampCamera();
     const scale = Math.min(1, C.render.waterResolution / Math.max(rect.width, rect.height));
     this.off.width = Math.ceil(rect.width * scale); this.off.height = Math.ceil(rect.height * scale);
     this.image = this.octx.createImageData(this.off.width, this.off.height);
     this.buildScene();
   }
+  thumbnail(theme) {
+    return artURL(theme.art.replace('assets/', 'assets/thumb-'));
+  }
+  setReducedMotion(value) { this.userReduced = !!value; this.reduced = this.preview || this.userReduced || this.motionPreference.matches; }
+  clampCamera() {
+    const v = this.view;
+    v.x = Math.max(this.width - v.width, Math.min(0, v.x));
+    v.y = Math.max(this.height - v.height, Math.min(0, v.y));
+  }
+  resetCamera() {
+    this.cameraScale = this.preview ? 1 : 1.08;
+    this.view.width = this.width * this.cameraScale;
+    this.view.height = this.height * this.cameraScale;
+    this.view.size = Math.min(this.width,this.height) * this.cameraScale;
+    this.view.x = (this.width - this.view.width) / 2;
+    this.view.y = (this.height - this.view.height) / 2;
+  }
+  zoomAt(clientX, clientY, factor) {
+    if (this.preview) return;
+    const rect = this.canvas.getBoundingClientRect(), anchorX = clientX - rect.left, anchorY = clientY - rect.top;
+    const old = this.view, nextScale = Math.max(1.08,Math.min(2.4,this.cameraScale * factor));
+    const gx = (anchorX - old.x) / old.width, gy = (anchorY - old.y) / old.height;
+    this.cameraScale = nextScale;
+    this.view = { x:anchorX - gx * this.width * nextScale, y:anchorY - gy * this.height * nextScale, width:this.width * nextScale, height:this.height * nextScale, size:Math.min(this.width,this.height) * nextScale };
+    this.clampCamera();
+  }
+  pan(dx, dy) { if (this.preview) return; this.view.x += dx; this.view.y += dy; this.clampCamera(); }
+  stonePreview(index) {
+    const rocks = rocksFor(this.theme), stone = rocks[(index + 5) % rocks.length];
+    if (!stone.previewURL) stone.previewURL = stone.toDataURL();
+    return stone.previewURL;
+  }
+  get artVersion() { return artVersion; }
   point(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), v = this.view;
     return { x: Math.round((clientX - r.left - v.x) / v.width * C.size), y: Math.round((clientY - r.top - v.y) / v.height * C.size) };
   }
   buildScene() {
-    const w = this.off.width, h = this.off.height, count = w * h;
-    this.details = new Float32Array(count * 6); this.reflection = new Uint8ClampedArray(count * 3);
-    const bed = surface(w, h), b = bed.getContext('2d');
-    b.fillStyle = '#55594b'; b.fillRect(0, 0, w, h);
-    const rng = mulberry32(72419);
-    // Submerged gravel is actual cached stone material, visible through shallows.
+    const w = this.off.width, h = this.off.height, count = w * h, theme = this.theme, scene = theme.scene;
+    this.rocks = rocksFor(theme);
+    this.details = new Float32Array(count * 6); this.reflection = new Uint8ClampedArray(count * 3); this.caustics = new Float32Array(count);
+    const bed = surface(w, h), b = bed.getContext('2d'), rng = mulberry32(scene.seed);
+    b.fillStyle = scene.bed; b.fillRect(0, 0, w, h);
+    // Small pebbles sit beneath the water; visibility is controlled by depth.
     for (let i = 0; i < C.render.gravelCount; i++) {
-      const x = rng() * w, y = rng() * h, r = 1 + rng() * 9;
-      b.globalAlpha = .3 + rng() * .5;
-      b.drawImage(this.rocks[i % this.rocks.length], x - r, y - r, r * 2, r * 1.5);
+      const x = rng() * w, y = rng() * h, r = .6 + rng() ** 2 * 7;
+      b.globalAlpha = .18 + rng() * .42;
+      b.drawImage(this.rocks[i % this.rocks.length], x - r, y - r, r * 2, r * 1.6);
     }
     b.globalAlpha = 1; this.bed = b.getImageData(0, 0, w, h).data;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const u = x / w, v = y / h, i = y * w + x, j = i * 6;
-      const terrain = fbm(u * 7, v * 7, 51), cloud = fbm(u * 3, v * 4, 113);
-      const left = Math.exp(-((u + .10) ** 2 * 14 + (v - .80) ** 2 * 2));
-      const right = Math.exp(-((u - 1.08) ** 2 * 18 + (v - .15) ** 2 * 5));
-      const shallow = clamp((left + right) * .8 + terrain * .09);
-      this.details[j] = noise(u * 15, v * 20, 7); this.details[j + 1] = noise(u * 31, v * 45, 47);
-      this.details[j + 2] = shallow; this.details[j + 3] = cloud;
-      this.details[j + 4] = u * 85 + v * 134; this.details[j + 5] = u * 139 - v * 73 + terrain * 13;
-      // Soft reflected canopy, irregular and concentrated near the bank.
-      const canopy = clamp((noise(u * 18, v * 12, 33) * .65 + noise(u * 40, v * 15, 99) * .35 - .32) * 2) * clamp((.23 - u) * 4 + (u - .83) * 3);
-      const k = i * 3, t = this.theme;
-      for (let c = 0; c < 3; c++) this.reflection[k + c] = t.base[c] + cloud * t.light[c] - canopy * (19 + c * 4);
+      const terrain = fbm(u * 5, v * 6, scene.seed), cloud = fbm(u * 2.7, v * 3.2, scene.seed + 113);
+      const bankY = scene.banks[0];
+      const left = Math.exp(-((u + .06) ** 2 * 27 + (v - bankY) ** 2 * 3.5));
+      const right = Math.exp(-((u - 1.06) ** 2 * 33 + (v - scene.banks[1]) ** 2 * 6));
+      const shallow = clamp((left + right) * .94 + (terrain - .5) * .22);
+      const branch = noise(u * 14, v * 9, scene.seed + 33) * .65 + noise(u * 31, v * 24, scene.seed + 99) * .35;
+      const canopy = clamp((branch - .28) * 2) * clamp((.36 - u) * 3.6 + (u - .71) * 3.4) * scene.canopy;
+      const sky = .3 + cloud * .55 + Math.exp(-((u - .64) ** 2 * 9 + (v - .28) ** 2 * 5)) * .17;
+      const sunlight = Math.exp(-((u - .82) ** 2 * 7 + (v - .16) ** 2 * 10));
+      this.caustics[i] = causticEdge(u * 20 + terrain * 2.6, v * 16 + cloud * 2.4, scene.seed) * (shallow * .8 + sunlight * .38) * scene.clarity;
+      this.details[j] = terrain; this.details[j + 1] = cloud;
+      this.details[j + 2] = shallow; this.details[j + 3] = sky;
+      // Long, coherent wind ripples. Low-frequency distortion avoids a marbled surface.
+      this.details[j + 4] = u * 2400 + v * 26000 + terrain * 6400;
+      this.details[j + 5] = u * 8200 - v * 18500 + cloud * 3900;
+      const k = i * 3;
+      for (let c = 0; c < 3; c++) this.reflection[k + c] = theme.base[c] + sky * theme.light[c] - canopy * (25 + c * 3) + sunlight * 16;
     }
+    this.buildShore();
+    this.cachedTheme = theme;
+  }
+  buildShore() {
     this.foreground = surface(this.canvas.width, this.canvas.height);
     const f = this.foreground.getContext('2d'); f.scale(this.dpr, this.dpr);
-    const W = this.width, H = this.height, random = mulberry32(1803);
-    // Cropped shoreline at the camera edge. Natural silhouettes
-    // continue beyond the camera rather than forming a decorative frame.
+    const W = this.width, H = this.height, scene = this.theme.scene, random = mulberry32(scene.seed + 1803);
+    const unit = this.preview ? W / 1216 : 1;
     for (let side = 0; side < 2; side++) {
-      const cx = side ? W + 23 : -24, cy = side ? H * .19 : H * .78, extent = Math.min(65, W * .11);
-      const shadow = f.createRadialGradient(cx, cy, 4, cx, cy, extent * 2.2);
-      shadow.addColorStop(0, '#16231c99'); shadow.addColorStop(1, '#16231c00'); f.fillStyle = shadow; f.fillRect(cx - extent * 2.2, cy - extent * 2.2, extent * 4.4, extent * 4.4);
-      for (let i = 0; i < 64; i++) {
-        const px = cx + (random() - .5) * extent * 1.4, py = cy + (random() - .5) * extent * 4.5, r = 7 + random() * 20;
-        f.save(); f.translate(px, py); f.rotate(random() * 6.28); f.shadowColor = '#101a1bc0'; f.shadowBlur = 7; f.shadowOffsetY = 5; f.drawImage(this.rocks[i % this.rocks.length], -r, -r, r * 2, r * 1.7); f.restore();
+      const cx = side ? W + 18 * unit : -20 * unit, cy = H * scene.banks[side];
+      const extent = Math.min(60 * unit, W * .055) * scene.shore;
+      const shadow = f.createRadialGradient(cx, cy, 0, cx, cy, extent * 2.6);
+      shadow.addColorStop(0, '#102a1cb3'); shadow.addColorStop(1, '#102a1c00');
+      f.fillStyle = shadow; f.fillRect(cx - extent * 3, cy - extent * 3, extent * 6, extent * 6);
+      // Overlapping bank stones have dry crowns, dark waterlines and contact shadows.
+      for (let i = 0; i < 62; i++) {
+        const px = cx + (random() - .5) * extent * 1.4, py = cy + (random() - .5) * H * .66;
+        const r = (8 + random() * 21) * unit * (scene.plants === 'alpine' ? 1.3 : 1);
+        f.save(); f.translate(px, py); f.rotate(random() * 6.28);
+        f.shadowColor = '#081b1caf'; f.shadowBlur = 5 * unit; f.shadowOffsetY = 4 * unit;
+        f.drawImage(this.rocks[i % this.rocks.length], -r, -r, r * 2, r * 1.7);
+        f.restore();
       }
-      for (let i = 0; i < 55; i++) {
-        const px = cx + (random() - .5) * extent, py = cy + (random() - .5) * extent * 4, length = 15 + random() * 48, lean = (side ? -1 : 1) * (8 + random() * 26);
-        f.strokeStyle = ['#474f35','#646949','#7b7751','#383f30'][i % 4]; f.lineWidth = .7 + random(); f.beginPath(); f.moveTo(px, py); f.quadraticCurveTo(px + lean, py - length * .4, px + lean * .9, py - length); f.stroke();
+      const plants = scene.plants === 'alpine' ? 18 : scene.plants === 'fern' ? 24 : 42;
+      for (let i = 0; i < plants; i++) {
+        const px = cx + (random() - .5) * extent * .9, py = cy + (random() - .5) * H * .68;
+        const length = (18 + random() * 44) * unit, lean = (side ? -1 : 1) * (7 + random() * 27) * unit;
+        f.strokeStyle = scene.foliage[i % 3]; f.fillStyle = scene.foliage[i % 3]; f.lineWidth = (.7 + random() * .6) * unit;
+        f.beginPath(); f.moveTo(px, py); f.quadraticCurveTo(px + lean * .4, py - length * .6, px + lean, py - length); f.stroke();
+        if (scene.plants === 'fern') {
+          // Paired tapering leaflets make a fern, rather than generic strands of grass.
+          for (let j = 1; j < 8; j++) {
+            const t = j / 8, x = px + lean * t * t, y = py - length * t;
+            const leaf = length * .2 * Math.sin(t * Math.PI);
+            for (const direction of [-1, 1]) {
+              f.beginPath(); f.moveTo(x, y);
+              f.quadraticCurveTo(x + leaf * direction, y + leaf * .25, x + leaf * direction, y - leaf * .55);
+              f.quadraticCurveTo(x + leaf * .4 * direction, y - leaf * .25, x, y); f.fill();
+            }
+          }
+        } else if (scene.plants === 'reed' && i % 3 === 0) {
+          f.strokeStyle = '#64513b'; f.lineWidth = 3 * unit; f.lineCap = 'round';
+          f.beginPath(); f.moveTo(px + lean, py - length); f.lineTo(px + lean * 1.04, py - length - 8 * unit); f.stroke(); f.lineCap = 'butt';
+        } else if (scene.plants === 'autumn') {
+          f.save(); f.translate(px + lean, py - length); f.rotate(random() * 6.28);
+          f.beginPath(); f.moveTo(0, -5 * unit); f.bezierCurveTo(7 * unit, -2 * unit, 5 * unit, 5 * unit, 0, 8 * unit); f.bezierCurveTo(-5 * unit, 3 * unit, -6 * unit, -1 * unit, 0, -5 * unit); f.fill(); f.restore();
+        }
+      }
+      if (scene.plants === 'autumn') {
+        for (let i = 0; i < 18; i++) {
+          const x = side ? W - random() * W * .045 : random() * W * .045, y = random() * H;
+          f.save(); f.translate(x, y); f.rotate(random() * 6.28); f.fillStyle = scene.foliage[i % 3]; f.globalAlpha = .8;
+          f.beginPath(); f.ellipse(0, 0, 4 * unit, 2 * unit, 0, 0, Math.PI * 2); f.fill(); f.restore();
+        }
       }
     }
-    this.cachedTheme = this.theme;
   }
   burst(x, y, time) { this.bursts.push({ x, y, time }); }
+  photoWater(wave, time) {
+    const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h;
+    const normalX = this.normalX, normalY = this.normalY;
+    for (let y = 1; y < 127; y++) for (let x = 1; x < 127; x++) {
+      const p = y * 128 + x;
+      normalX[p] = field[p + 1] - field[p - 1]; normalY[p] = field[p + 128] - field[p - 128];
+    }
+    const v = this.view;
+    for (let y = 0; y < h; y++) {
+      const gy = (y / h * this.height - v.y) / v.height * 128, iy = Math.floor(gy), fy = gy - iy;
+      for (let x = 0; x < w; x++) {
+        const p = (y * w + x) * 4, gx = (x / w * this.width - v.x) / v.width * 128, ix = Math.floor(gx), fx = gx - ix;
+        let nx = 0, ny = 0;
+        if (ix > 0 && ix < 126 && iy > 0 && iy < 126) {
+          const c = iy * 128 + ix;
+          nx = mix(mix(normalX[c], normalX[c + 1], fx), mix(normalX[c + 128], normalX[c + 129], fx), fy);
+          ny = mix(mix(normalY[c], normalY[c + 1], fx), mix(normalY[c + 128], normalY[c + 129], fx), fy);
+        }
+        const light = nx * .7 + ny * .9;
+        const shimmer = this.reduced ? 0 : Math.max(0, this.sines[(x * 14 + y * 21 + time * 28) & 2047] * this.sines[(x * 23 - y * 9 - time * 21) & 2047]) * .004;
+        if (light >= 0) {
+          data[p] = 223; data[p + 1] = 245; data[p + 2] = 238;
+          data[p + 3] = clamp(light * 3.2 + shimmer, 0, .19) * 255;
+        } else {
+          data[p] = 4; data[p + 1] = 39; data[p + 2] = 47;
+          data[p + 3] = clamp(-light * 2, 0, .12) * 255;
+        }
+      }
+    }
+    this.octx.putImageData(this.image, 0, 0);
+  }
   water(wave, time) {
     const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h, v = this.view;
     const sx = this.width / w, sy = this.height / h, invX = C.size / v.width, invY = C.size / v.height, d = this.details, ref = this.reflection;
-    const t = this.reduced ? 0 : time, sines = this.sines, phase = t * 117, phase2 = t * 83;
+    const t = this.reduced ? 0 : time, sines = this.sines, phase = t * 76, phase2 = t * 53, clarity = this.theme.scene.clarity;
     // Interpolate all four normal samples, not just one axis: the fixed
     // physical grid must not leave stair steps in the rendered highlights.
     const normalX = this.normalX, normalY = this.normalY;
@@ -131,32 +288,44 @@ export class Renderer {
           ny = mix(mix(normalY[c], normalY[c + 1], fx), mix(normalY[c + 128], normalY[c + 129], fx), fy);
 
         }
-        const wind1 = sines[(d[j + 4] * 760 + phase + d[j] * 18000) & 2047];
-        const wind2 = sines[(d[j + 5] * 410 - phase2 + d[j + 1] * 11000) & 2047];
-        const ambient = wind1 * wind2 * .65 + wind1 * .24 + wind2 * .19;
+        const wind1 = sines[(d[j + 4] + phase) & 2047];
+        const wind2 = sines[(d[j + 5] - phase2) & 2047];
+        const wind3 = sines[(d[j + 4] * 2.17 + d[j + 5] * .28 + phase * 1.3) & 2047];
+        const ambient = wind1 * .58 + wind2 * .3 + wind3 * .12;
         const normal = nx * .7 + ny * .9;
-        const light = clamp(normal * C.render.normalGain, -25, 35) + ambient * 2.5;
-        const rx = Math.max(0, Math.min(w - 1, Math.round(x + nx * 70 + wind1 * 1.8)));
-        const ry = Math.max(0, Math.min(h - 1, Math.round(y + ny * 70 + wind2 * 1.8)));
+        const light = clamp(normal * C.render.normalGain, -24, 32) + ambient * 2.7 + wind1 * wind2;
+        const rx = Math.max(0, Math.min(w - 1, Math.round(x + nx * 85 + wind1 * 1.1)));
+        const ry = Math.max(0, Math.min(h - 1, Math.round(y + ny * 85 + wind2 * 1.5)));
         const ri = (ry * w + rx) * 3, bi = (ry * w + rx) * 4;
-        const shallow = d[j + 2], glitter = Math.max(0, ambient - .92) * 12 * d[j + 3];
-        const reflectionMix = .94 - shallow * .60;
+        const shallow = d[j + 2], glitter = Math.max(0, ambient + normal * 2 - .57) ** 2 * 50 * d[j + 3];
+        const reflectionMix = .98 - shallow * clarity * .7;
+        const caustic = this.caustics[ry * w + rx] * (19 + wind3 * 5) + Math.max(0, 1 - Math.abs(wind1 + wind2 * .6) * 5) ** 2 * shallow * clarity * 3;
         const crest = clamp(height * 16, -.7, .7);
-        data[p] = mix(this.bed[bi] * .77, ref[ri], reflectionMix) + light + glitter + crest;
-        data[p + 1] = mix(this.bed[bi + 1] * .82, ref[ri + 1], reflectionMix) + light + glitter + crest;
-        data[p + 2] = mix(this.bed[bi + 2] * .83, ref[ri + 2], reflectionMix) + light * 1.02 + glitter;
+        data[p] = mix(this.bed[bi] * .73, ref[ri], reflectionMix) + light + glitter + crest + caustic;
+        data[p + 1] = mix(this.bed[bi + 1] * .91, ref[ri + 1], reflectionMix) + light + glitter + crest + caustic;
+        data[p + 2] = mix(this.bed[bi + 2] * .85, ref[ri + 2], reflectionMix) + light * 1.02 + glitter + caustic;
         data[p + 3] = 255;
       }
     }
     this.octx.putImageData(this.image, 0, 0);
   }
   draw(wave, level, stones, lit, time, running, hints = [], hover = null) {
-    if (this.cachedTheme !== this.theme) this.buildScene();
-    this.water(wave, time);
+    if (this.cachedTheme !== this.theme || this.rocksVersion !== artVersion) { this.buildScene(); this.rocksVersion = artVersion; }
+    const photo = lakeImage(this.theme);
+    const activeRipples = photo && running && wave.stepNumber > 0;
+    if (activeRipples) this.photoWater(wave, time);
+    else if (!photo) this.water(wave, time);
     const ctx = this.ctx, W = this.width, H = this.height, v = this.view, scale = v.size / C.size;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(this.off, 0, 0, W, H);
+    const art = photo ? artURL(this.theme.art) : '';
+    if (this.displayedArt !== art) {
+      this.canvas.style.backgroundImage = art ? `linear-gradient(to bottom, transparent 65%, #15263248), url("${art}")` : '';
+      this.displayedArt = art;
+    }
+    this.canvas.style.backgroundSize = `100% 100%, ${v.width}px ${v.height}px`;
+    this.canvas.style.backgroundPosition = `0 0, ${v.x}px ${v.y}px`;
+    if (activeRipples || !photo) ctx.drawImage(this.off, 0, 0, W, H);
     ctx.save();
     if (this.zoom && !this.reduced) { const z = 1 + this.zoom * .014; ctx.translate(v.x + v.width / 2, v.y + v.height / 2); ctx.scale(z, z); ctx.translate(-v.x - v.width / 2, -v.y - v.height / 2); }
     ctx.translate(v.x, v.y); ctx.scale(v.width / C.size, v.height / C.size);
@@ -166,13 +335,13 @@ export class Renderer {
     for (let i = 0; i < level.rocks.length; i++) {
       const r = level.rocks[i];
       ctx.save(); ctx.translate(r.x, r.y);
-      ctx.fillStyle = '#131b20aa'; ctx.beginPath(); ctx.ellipse(.6, .9, r.rx * 1.08, r.ry * 1.06, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#b9c9cd66'; ctx.lineWidth = .23; ctx.beginPath(); ctx.ellipse(0, 0, r.rx * 1.04, r.ry * 1.03, 0, .2, Math.PI * 1.5); ctx.stroke();
-      ctx.drawImage(this.rocks[(i + 2) % this.rocks.length], -r.rx * 1.08, -r.ry * 1.08, r.rx * 2.16, r.ry * 2.16); ctx.restore();
+      ctx.shadowColor = '#091d1bb0'; ctx.shadowBlur = 5 * this.dpr; ctx.shadowOffsetX = 1.5 * this.dpr; ctx.shadowOffsetY = 3 * this.dpr;
+      ctx.drawImage(boulder.complete && boulder.naturalWidth ? boulder : this.rocks[(i + 2) % this.rocks.length], -r.rx * 1.16, -r.ry * 1.16, r.rx * 2.32, r.ry * 2.32); ctx.restore();
     }
-    for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); if (level.number >= C.delayUnlock) { ctx.save(); ctx.translate(p.x,p.y); ctx.scale(v.size / v.width, v.size / v.height); ctx.fillStyle = '#f1e5c4'; ctx.font = '2.6px Arial'; ctx.textAlign = 'center'; ctx.fillText(`${p.delay || 0}s`,0,-5); ctx.restore(); } }
+    for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     if (hover && !running && hover.x >= 7 && hover.x <= 121 && hover.y >= 7 && hover.y <= 121) {
-      ctx.strokeStyle = hover.valid ? '#e8e9e187' : '#e4bdac77'; ctx.lineWidth = .17; ctx.beginPath(); ctx.ellipse(hover.x, hover.y, 3, 3, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = hover.keyboard ? '#fff4d9' : hover.valid ? '#e8e9e187' : '#e4bdac77'; ctx.lineWidth = hover.keyboard ? .45 : .17; ctx.beginPath(); ctx.ellipse(hover.x, hover.y, 3, 3, 0, 0, Math.PI * 2); ctx.stroke();
+      if(hover.keyboard) { ctx.beginPath(); ctx.moveTo(hover.x-5,hover.y);ctx.lineTo(hover.x+5,hover.y);ctx.moveTo(hover.x,hover.y-5);ctx.lineTo(hover.x,hover.y+5);ctx.stroke(); }
     }
     stones.forEach((stone, i) => {
       const age = (wave.stepNumber - (stone.delay || 0) * C.delaySteps) / C.delaySteps, sinking = running && age >= 0;
@@ -186,17 +355,36 @@ export class Renderer {
         ctx.beginPath(); ctx.arc(0, 0, .6 + age * 9, 0, Math.PI * 2); ctx.stroke();
         for (let k = 0; k < 9; k++) { const a = k * 2.3999, r = age * 12; ctx.fillStyle = `rgba(218,232,235,${clamp(1 - age / .32) * .7})`; ctx.beginPath(); ctx.ellipse(Math.cos(a) * r, Math.sin(a) * r - Math.sin(age / .38 * Math.PI) * 2, .12, .23, a, 0, Math.PI * 2); ctx.fill(); } ctx.restore();
       }
-      if (level.number >= C.delayUnlock && (!sinking || age < 0)) { ctx.fillStyle = '#edf0ea'; ctx.font = '2.6px Arial'; ctx.textAlign = 'center'; ctx.fillText(`${stone.delay || 0}s`, stone.x, stone.y + 5); }
     });
     level.lanterns.forEach((l, i) => this.lantern(ctx, l, lit[i], time, i, wave));
     this.bursts = this.bursts.filter(b => time - b.time < 1.4);
     if (!this.reduced) for (const b of this.bursts) {
       const age = time - b.time; ctx.strokeStyle = `rgba(242,218,166,${(1 - age / 1.4) * .24})`; ctx.lineWidth = .2; ctx.beginPath(); ctx.arc(b.x, b.y, 3 + age * 11, 0, Math.PI * 2); ctx.stroke();
     }
-    ctx.restore(); ctx.drawImage(this.foreground, 0, 0, W, H);
-    const shade = ctx.createLinearGradient(0, H * .65, 0, H); shade.addColorStop(0, '#15263200'); shade.addColorStop(1, '#15263248'); ctx.fillStyle = shade; ctx.fillRect(0, 0, W, H);
+    ctx.restore(); if (!photo) ctx.drawImage(this.foreground, 0, 0, W, H);
+    if (!photo) { const shade = ctx.createLinearGradient(0, H * .65, 0, H); shade.addColorStop(0, '#15263200'); shade.addColorStop(1, '#15263248'); ctx.fillStyle = shade; ctx.fillRect(0, H * .65, W, H * .35); }
+    // Draw timing labels in CSS pixels: projecting the lake must not squash its text.
+    if (level.number >= C.delayUnlock) {
+      const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) * .875;
+      const zoom = this.zoom && !this.reduced ? 1 + this.zoom * .014 : 1;
+      const label = (stone, above) => {
+        const text = `${stone.delay || 0}s`;
+        ctx.font = `600 ${fontSize}px system-ui, sans-serif`;
+        const width = ctx.measureText(text).width + 12, height = fontSize + 8;
+        const x = clamp(v.x + v.width/2 + (stone.x/C.size-.5)*v.width*zoom, width/2+2, W-width/2-2);
+        const offset = Math.max(C.render.placedStoneRadius*scale, C.render.stoneMinPixels/2) + height/2 + 4;
+        const y = clamp(v.y + v.height/2 + (stone.y/C.size-.5)*v.height*zoom + (above ? -offset : offset), height/2+2, H-height/2-2);
+        ctx.fillStyle = '#1b2c33'; ctx.beginPath(); ctx.roundRect(x-width/2,y-height/2,width,height,6); ctx.fill();
+        ctx.fillStyle = above ? '#e7c58f' : '#eef3ef'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text,x,y);
+      };
+      ctx.save();
+      hints.forEach(stone=>label(stone,true));
+      stones.filter(stone=>!running || wave.stepNumber<(stone.delay||0)*C.delaySteps).forEach(stone=>label(stone,false));
+      ctx.restore();
+    }
   }
   lantern(ctx, l, on, time, i, wave) {
+    if (this.reduced) time = 0;
     const bob = this.reduced ? 0 : Math.sin(time * 1.2 + i * 1.7) * .13;
     ctx.save(); ctx.translate(l.x, l.y + bob);
     const objectScale = Math.max(1, C.render.lanternMinPixels / (5 * this.view.size / C.size)); ctx.scale(objectScale * this.view.size / this.view.width, objectScale * this.view.size / this.view.height);

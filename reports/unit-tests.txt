@@ -2,25 +2,42 @@
 > ripple-pond@1.0.0 test
 > node --test tests/*.test.mjs
 
-✔ star improvement and goal bonuses cannot be farmed by replay (1.729516ms)
-✔ daily UTC streak counts each day once and resets after a gap (0.240434ms)
-✔ corrupt saves recover and day rollover resets goals only (0.738175ms)
-✔ ads blocked in first three minutes and before five completes (1.699124ms)
-✔ successful reward pauses/mutes and resumes exactly once; cooldown prevents chain (0.463383ms)
-✔ unfilled and thrown errors resume without granting reward (0.511527ms)
-✔ no SDK remains fully safe and storage failures are contained (0.211756ms)
-✔ fixed grid, exact repeatability, finite long-run energy (358.04146ms)
-✔ one stone near / far calibration and constructive overlap (243.209966ms)
-✔ rock walls stay zero and reflective boundary uses own cell (62.328814ms)
-✔ delayed impulses enter only on their integer simulation step (18.545753ms)
-✔ all 10 authored onboarding solutions are valid and robust (532.476235ms)
-✔ generated level and UTC date seed are deterministic (601.420272ms)
-✔ sparse peak tracking is bit-identical to full-grid peaks at every candidate (106.270101ms)
-ℹ tests 14
+✔ lake ambience can be muted while stone effects remain audible (6.402304ms)
+✔ coins can unlock only the next lake, once, after the first solve (1.886863ms)
+✔ star improvement and goals cannot be farmed by replay (0.507771ms)
+✔ daily streak requires all three lakes, survives resume, pays once, resets after gap (1.137153ms)
+✔ chapters and earned hints reward new completions once, records improve (0.759704ms)
+✔ old and corrupt saves recover, UTC rollover resets goals only (0.244402ms)
+✔ first-run guidance and menu preferences survive saves without interrupting existing players (0.363418ms)
+✔ active daily mode survives saves without unlocking it early (0.157553ms)
+✔ chapter mastery rewards improving old lakes and cannot be farmed after reload (0.422655ms)
+✔ journal return rewards count distinct days without requiring a streak (0.609943ms)
+✔ legacy saves retain stars and gain missing journal fields; discoveries pay once (0.424578ms)
+✔ daily stars never count as journey mastery and journal rewards respect the hint cap (0.423817ms)
+✔ result explains daily bonus stars and announces only newly crossed atmosphere unlocks (0.80372ms)
+✔ mastery suggests a completed lake closest to three stars and never opens locked lakes (0.361805ms)
+✔ mastery suggestions stay within the browsed chapter and do not mutate saves (0.281987ms)
+✔ Basic Launch never offers or requests ads (4.631112ms)
+✔ first three minutes, five new lakes and shared cooldown prevent early/chained ads (0.524476ms)
+✔ input blocked on request, sound muted only on start, duplicate finish ignored (0.472559ms)
+✔ unfilled and thrown requests recover without muting or granting rewards (0.532487ms)
+✔ ad timeout releases input and ignores late callbacks (0.971227ms)
+✔ blocked/basic-disabled responses hide future rewarded offers (0.255779ms)
+✔ initialized SDK settings override audio and cloud is read before any write (0.737281ms)
+✔ disabled SDK never receives game/data calls (0.249479ms)
+✔ no SDK and storage failures remain safe (0.299474ms)
+✔ fixed grid, exact repeatability, finite long-run energy (190.333865ms)
+✔ one stone near / far calibration and constructive overlap (136.892709ms)
+✔ rock walls stay zero and reflective boundary uses own cell (32.750449ms)
+✔ delayed impulses enter only on their integer simulation step (11.183438ms)
+✔ all 10 authored onboarding solutions are valid and robust (307.439865ms)
+✔ generated level and UTC date seed are deterministic (341.042501ms)
+✔ sparse peak tracking is bit-identical to full-grid peaks at every candidate (57.759726ms)
+ℹ tests 31
 ℹ suites 0
-ℹ pass 14
+ℹ pass 31
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2090.378088
+ℹ duration_ms 1219.473506
