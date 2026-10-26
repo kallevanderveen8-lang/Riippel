@@ -105,7 +105,7 @@ try{
  await mock.goto(`${base}/?test`);await mock.waitForFunction(()=>window.__ripple?.state.level.number===6&&window.__ripple.portal.sdk);
  assert.ok(await mock.locator('#sound').isDisabled());
  await mock.click('#pause');await mock.click('#pause-settings');
- assert.ok(await mock.locator('#setting-sound').isDisabled());assert.ok(await mock.locator('#setting-ambience').isDisabled());
+ assert.ok(await mock.locator('#setting-sound').isDisabled());assert.ok(await mock.locator('#setting-ambience').isDisabled());assert.ok(await mock.locator('#setting-music').isDisabled());
  assert.equal(await mock.locator('#setting-sound-note').isVisible(),true);
  await mock.click('#settings-close');await mock.click('#next');
  await mock.evaluate(()=>window.settingsChange({muteAudio:false}));assert.equal(await mock.locator('#sound').isDisabled(),false);

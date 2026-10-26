@@ -16,9 +16,10 @@ test('old and corrupt saves recover, UTC rollover resets goals only',()=>{assert
 test('first-run guidance and menu preferences survive saves without interrupting existing players',()=>{
  const fresh=parseProgress(JSON.stringify(freshProgress()));assert.equal(fresh.tutorialDone,false);
  const returning=parseProgress(JSON.stringify({version:C.version,level:1,campaign:{number:1,stones:[{x:64,y:64}]}}));assert.equal(returning.tutorialDone,true);
- const saved=freshProgress();saved.tutorialDone=true;saved.preferences={ambientSound:false,reducedMotion:true,highContrast:true,dockTop:true};
+ const saved=freshProgress();saved.tutorialDone=true;saved.preferences={ambientSound:false,musicEnabled:false,reducedMotion:true,highContrast:true,dockTop:true};
  assert.deepEqual(parseProgress(JSON.stringify(saved)).preferences,saved.preferences);
- assert.deepEqual(parseProgress(JSON.stringify({...saved,preferences:{reducedMotion:1,dockTop:null}})).preferences,{ambientSound:true,reducedMotion:true,highContrast:false,dockTop:false});
+ assert.deepEqual(parseProgress(JSON.stringify({...saved,preferences:{reducedMotion:1,dockTop:null}})).preferences,{ambientSound:true,musicEnabled:true,reducedMotion:true,highContrast:false,dockTop:false});
+ assert.equal(parseProgress(JSON.stringify({...saved,preferences:{ambientSound:false}})).preferences.musicEnabled,false);
 });
 
 test('active daily mode survives saves without unlocking it early',()=>{const p=freshProgress();p.level=4;p.mode='daily';assert.equal(parseProgress(JSON.stringify(p)).mode,'daily');p.level=1;assert.equal(parseProgress(JSON.stringify(p)).mode,'campaign');});
@@ -87,7 +88,9 @@ test('one daily puzzle pays once before the optional trail and unlocks its miles
 test('future cosmetics stay locked while earned postcards remain claimable',()=>{
  const p=freshProgress();p.tokens=100;
  assert.equal(buyCosmetic(p,'stones','quartz'),false);assert.equal(p.tokens,100);
+ assert.equal(buyCosmetic(p,'stones','void'),false);
  p.level=21;assert.equal(buyCosmetic(p,'stones','quartz'),true);assert.equal(p.tokens,86);
+ p.level=121;p.tokens=299;assert.equal(buyCosmetic(p,'stones','void'),false);p.tokens=300;assert.equal(buyCosmetic(p,'stones','void'),true);assert.equal(p.tokens,0);
  for(let n=1;n<=10;n++)p.stars[`l${n}`]=2;
  assert.equal(discoveries(p).find(d=>d.id==='postcard-0').ready,true);
  assert.equal(claimDiscovery(p,'postcard-0').reward,2);

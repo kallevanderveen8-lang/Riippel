@@ -530,6 +530,7 @@ header{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center
 .shop-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
 .shop-card{display:grid;grid-template-columns:58px minmax(0,1fr);grid-template-rows:1fr auto;align-items:center;gap:9px 11px;padding:11px;border:1px solid #98b7ac66;border-radius:10px;background:#123438a6;min-width:0}
 .shop-card.equipped{border-color:#e3cf9a;background:#2e4b42a8}
+.shop-card.collector{border-color:#d8bd8799;background:linear-gradient(145deg,#3950448c,#123438a6)}
 .shop-card.locked{background:#102e31a6}
 .shop-card.locked img{filter:saturate(.45);opacity:.72}
 .shop-card img{width:58px;height:58px;object-fit:contain;grid-row:1}

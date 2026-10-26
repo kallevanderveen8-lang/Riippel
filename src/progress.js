@@ -1,6 +1,6 @@
 import { C, lakeForLevel } from './config.js';
 import { daySeed } from './simulation.js';
-export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, mastery: {}, lakeRewards: {}, discoveries: {}, records: {}, tokens: C.initialTokens, theme: 0, lakeLights: {}, cosmetics: {stones:['river'],lanterns:['bronze'],stone:'river',lantern:'bronze'}, dailyGift:{lastDay:0,streak:0,total:0}, muted: false, tutorialDone: false, preferences: { ambientSound: true, reducedMotion: false, highContrast: false, dockTop: false }, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
+export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, mastery: {}, lakeRewards: {}, discoveries: {}, records: {}, tokens: C.initialTokens, theme: 0, lakeLights: {}, cosmetics: {stones:['river'],lanterns:['bronze'],stone:'river',lantern:'bronze'}, dailyGift:{lastDay:0,streak:0,total:0}, muted: false, tutorialDone: false, preferences: { ambientSound: true, musicEnabled: true, reducedMotion: false, highContrast: false, dockTop: false }, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
 export function parseProgress(raw) {
   try {
     const p = JSON.parse(raw); if (!p || p.version !== C.version) return freshProgress();
@@ -9,7 +9,7 @@ export function parseProgress(raw) {
     out.mode = out.mode === 'daily' && out.level > C.dailyUnlock ? 'daily' : 'campaign';
     out.theme = Math.max(0, Math.min(C.themes.length - 1, Math.floor(Number(out.theme) || 0)));
     out.tutorialDone = Object.hasOwn(p, 'tutorialDone') ? !!p.tutorialDone : out.level > 1 || !!p.stars?.l1 || !!p.campaign;
-    out.preferences = { ambientSound: p.preferences?.ambientSound !== false, reducedMotion: !!p.preferences?.reducedMotion, highContrast: !!p.preferences?.highContrast, dockTop: !!p.preferences?.dockTop };
+    out.preferences = { ambientSound: p.preferences?.ambientSound !== false, musicEnabled: p.preferences?.musicEnabled !== false && (p.preferences?.musicEnabled !== undefined || p.preferences?.ambientSound !== false), reducedMotion: !!p.preferences?.reducedMotion, highContrast: !!p.preferences?.highContrast, dockTop: !!p.preferences?.dockTop };
     out.bonus = Math.max(0, Number(out.bonus) || 0); out.tokens = Math.max(0, Math.min(C.maxTokens, Math.floor(Number(out.tokens) || 0)));
     for (const key of ['stars','doubled','dailyResults','chapters','mastery','lakeRewards','discoveries','records']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
     // Old saves earned landscape choices by stars. Keep their progress, but the

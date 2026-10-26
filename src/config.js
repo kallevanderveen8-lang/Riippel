@@ -10,7 +10,7 @@ export const C = Object.freeze({
   themeStars: 10, hintFailures: 2, rewardedFailures: 3, masteryTokens: 2, guidedHelpFailures: 6,
   firstAdSeconds: 180, adIntervalSeconds: 180, adEveryLevels: 5,
   adTimeoutMs: 90000, sdkTimeoutMs: 2500, saveKey: 'ripple-pond-v1',
-  winSeconds: 1.8, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], recordLimit: 300, maxTokens: 999, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
+  winSeconds: 1.0, burstSeconds: 1.05, bubbleSeconds: 0.48, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], recordLimit: 300, maxTokens: 999, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, lakeSkipCost: 3, solverBudget: 24, benchmarkCount: 300,
   cosmetics: {
     stones: [
@@ -25,7 +25,11 @@ export const C = Object.freeze({
       { id:'opal', name:'Opal stone', cost:20, kind:'Natural', unlockLevel:31 },
       { id:'duck', name:'Duck pebble', cost:25, kind:'Playful', unlockLevel:41 },
       { id:'bread', name:'Little loaf', cost:35, kind:'Playful', unlockLevel:61 },
-      { id:'cosmic', name:'Cosmic stone', cost:45, kind:'Playful', unlockLevel:91 }
+      { id:'cosmic', name:'Cosmic stone', cost:45, kind:'Playful', unlockLevel:91 },
+      { id:'missing', name:'404 pebble', cost:65, kind:'Internet oddity', unlockLevel:51 },
+      { id:'loading', name:'Loading pebble', cost:95, kind:'Internet oddity', unlockLevel:71 },
+      { id:'royal-duck', name:'Royal duck', cost:180, kind:'Collector', unlockLevel:101 },
+      { id:'void', name:'Tiny black hole', cost:300, kind:'Collector', unlockLevel:121 }
     ],
     lanterns: [
       { id:'bronze', name:'Bronze lantern', cost:0, kind:'Classic' },
@@ -35,7 +39,10 @@ export const C = Object.freeze({
       { id:'copper', name:'Copper lantern', cost:12, kind:'Warm', unlockLevel:21 },
       { id:'lotus', name:'Lotus lantern', cost:18, kind:'Natural', unlockLevel:31 },
       { id:'star', name:'Starlight lantern', cost:25, kind:'Cool', unlockLevel:51 },
-      { id:'moon', name:'Moonstone lantern', cost:32, kind:'Cool', unlockLevel:81 }
+      { id:'moon', name:'Moonstone lantern', cost:32, kind:'Cool', unlockLevel:81 },
+      { id:'signal', name:'Signal lantern', cost:75, kind:'Internet oddity', unlockLevel:61 },
+      { id:'sunflower', name:'Sunflower lantern', cost:125, kind:'Natural', unlockLevel:81 },
+      { id:'aurora', name:'Aurora lantern', cost:220, kind:'Collector', unlockLevel:111 }
     ]
   },
   themes: [
@@ -52,7 +59,7 @@ export const C = Object.freeze({
     { name: 'Alpine dawn', art: 'assets/alpine-dawn.webp', landscape: 'Alpine basin', description: 'Clear turquoise water, pale granite and sparse mountain grass.', base: [30, 81, 88], light: [75, 101, 101], accent: '#b9d7d0', stone: '#a3aaa3', notes: [196, 293.66, 392], unlock: 120,
       scene: { seed: 61843, banks: [.32, .74], bed: '#a1aa95', plants: 'alpine', foliage: ['#4b6251','#71816a','#a2a48a'], clarity: .95, canopy: .16, shore: 1.25 } }
   ],
-  audio: { master: 0.24, ambient: 0.025, chime: 0.18, splash: 0.10, waterLoopSeconds: 4, waterLowpass: 650, waterBed: 0.055 },
+  audio: { master: 0.24, padBed: 0.005, musicBus: 0.6, musicNote: 0.024, chime: 0.11, resolve: 0.055, reward: 0.07, splash: 0.07, place: 0.018, waterLoopSeconds: 4, waterLowpass: 650, waterBed: 0.055 },
   render: { dpr: 2, waterResolution: 560, normalGain: 280, stoneVariants: 9, stoneTexture: 128, gravelCount: 1600, placedStoneRadius: 2.6, stoneMinPixels: 20, lanternMinPixels: 24 },
 });
 export function lakeForLevel(number) {

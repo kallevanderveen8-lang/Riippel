@@ -75,7 +75,8 @@ function dialogOpen() { return !!document.querySelector('dialog[open]'); }
 function paused() { return manualPause || hidden || adPaused || loading || dialogOpen(); }
 function syncPause(visibilityOnly = false) {
   if (paused()) cancelPointer();
-  sound.paused = manualPause || hidden || adPlaying || loading || dialogOpen(); sound.sync();
+  sound.paused = hidden || adPlaying || loading;
+  sound.inMenu = manualPause || dialogOpen() || phase === 'complete'; sound.sync();
   // The SDK tracks tab visibility itself. Local audio/physics still pause.
   if (!visibilityOnly) {
     if (manualPause || adPaused || loading || dialogOpen() || phase === 'complete') portal.stop(); else portal.start();
@@ -96,7 +97,7 @@ function applyTheme() {
 }
 function applyPreferences() {
   const preferences = progress.preferences;
-  sound.ambientEnabled = preferences.ambientSound; sound.sync();
+  sound.ambientEnabled = preferences.ambientSound; sound.musicEnabled = preferences.musicEnabled; sound.sync();
   renderer.setReducedMotion(preferences.reducedMotion);
   document.documentElement.classList.toggle('user-reduced-motion',preferences.reducedMotion);
   document.documentElement.classList.toggle('user-high-contrast',preferences.highContrast);
@@ -105,6 +106,7 @@ function applyPreferences() {
   $('dock').setAttribute('aria-label',`Move controls to the ${preferences.dockTop?'bottom':'top'}`);
   $('setting-motion').checked = preferences.reducedMotion;
   $('setting-ambience').checked = preferences.ambientSound;
+  $('setting-music').checked = preferences.musicEnabled;
   $('setting-contrast').checked = preferences.highContrast;
   $('setting-dock').checked = preferences.dockTop;
 }
@@ -241,8 +243,8 @@ function renderShop() {
       const owned=progress.cosmetics[kind].includes(item.id),selected=progress.cosmetics[kind==='stones'?'stone':'lantern']===item.id;
       const locked=progress.level<(item.unlockLevel||1);
       const card=document.createElement('div'),image=document.createElement('img'),meta=document.createElement('div'),name=document.createElement('strong'),type=document.createElement('small'),button=document.createElement('button');
-      card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);card.classList.toggle('locked',locked);
-      image.src=renderer.cosmeticPreview(kind,item.id);image.alt='';name.textContent=item.name;type.textContent=item.kind;meta.append(name,type);
+      card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);card.classList.toggle('locked',locked);card.classList.toggle('collector',item.kind==='Collector');
+      image.src=renderer.cosmeticPreview(kind,item.id);image.alt='';name.textContent=item.name;type.textContent=locked?`${item.kind} · ${item.cost} coins`:item.kind;meta.append(name,type);
       button.textContent=selected?'Equipped':owned?'Equip':locked?`Level ${item.unlockLevel}`:`${item.cost} coins`;
       button.disabled=selected||locked||(!owned&&progress.tokens<item.cost);button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':locked?`Unlocks at level ${item.unlockLevel}`:`Buy for ${item.cost} coins`}: ${item.name}`);
       button.onclick=()=>{
@@ -260,6 +262,7 @@ function renderShop() {
 let rewardToastTimer;
 function showRewardToast(title,detail) {
   const toast=$('reward-toast');clearTimeout(rewardToastTimer);
+  sound.unlock();sound.reward();
   $('reward-toast-title').textContent=title;$('reward-toast-detail').textContent=detail;
   toast.hidden=false;toast.getAnimations().forEach(animation=>animation.cancel());
   if(!reducedMotion.matches&&!progress.preferences.reducedMotion) toast.animate([{opacity:0,transform:'translate(-50%,12px) scale(.96)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],{duration:360,easing:'cubic-bezier(.18,.8,.24,1)'});
@@ -303,6 +306,7 @@ function refresh() {
   $('setting-sound-note').textContent = portal.muteAudio ? 'Sound is controlled by CrazyGames' : 'All game audio';
   $('setting-sound-note').classList.toggle('sr-only',!portal.muteAudio);
   $('setting-ambience').disabled = sound.muted || !!portal.muteAudio;
+  $('setting-music').disabled = sound.muted || !!portal.muteAudio;
   $('settings-context').textContent = mode === 'daily' ? `Daily trail · Puzzle ${dailyStage + 1}` : `Level ${String(level.number).padStart(2,'0')} · ${lake.name}`;
   $('pause').setAttribute('aria-label',manualPause ? 'Resume game' : 'Pause game');
   $('pause').setAttribute('aria-pressed',String(manualPause));
@@ -365,6 +369,10 @@ function overlay() {
   if (!$('daily-continue').hidden) action('daily-continue',`Continue trail · ${dailyStage+2}/${C.dailyLength}`,'arrow-right');
   $('copy').hidden = !dailyDone; $('copy').textContent = 'Copy daily result';
   const rewards = [...(result?.newLake ? [`Next lake · ${result.newLake}`] : []), ...((result?.discoveries || []).length ? [`${result.discoveries.length} milestone${result.discoveries.length===1?'':'s'} ready to claim in Collection`] : [])];
+  if (result?.newLake) {
+    const newCosmetics = [...C.cosmetics.stones, ...C.cosmetics.lanterns].filter(item => item.unlockLevel === progress.level);
+    if (newCosmetics.length) rewards.push(`New in Shop · ${newCosmetics.length === 1 ? newCosmetics[0].name : `${newCosmetics.length} items`}`);
+  }
   if (result?.goalBonus) rewards.push(`Daily goals completed · +${result.goalBonus} stars`);
   if (result?.masteryReward) rewards.unshift(`Chapter mastered · +${C.masteryTokens} coins`);
   $('result-discovery').textContent = rewards.join('\n');
@@ -375,11 +383,11 @@ function overlay() {
 function rewardKey() { return mode === 'daily' ? `d${dailyDay}-${dailyStage}` : `l${level.number}`; }
 function drop() {
   if (phase !== 'ready' || paused() || !stones.length) return;
-  touched = true; attempts++; drops++; phase = 'running'; wave.reset(stones); lit.fill(false); sound.unlock(); sound.splash();
+  touched = true; attempts++; drops++; phase = 'running'; wave.reset(stones); lit.fill(false); sound.unlock(); sound.splash(progress.cosmetics.stone);
   renderer.failure=null;setInstruction('Watch your ripples meet.'); $('hint-finger').classList.remove('visible'); refresh(); save();
 }
 function win() {
-  phase = 'celebrate'; celebration = 0; renderer.zoom = 1; sound.chime(lit.length);
+  phase = 'celebrate'; celebration = 0; renderer.zoom = 1; sound.resolve();
 }
 function finishWin() {
   phase = 'complete'; renderer.zoom = 0;
@@ -398,13 +406,14 @@ function tick(dt) {
   if (phase === 'running') {
     for (let s = 0; s < (attempts>1 ? C.retryStepsPerTick : C.stepsPerTick); s++) {
       wave.step();
-      level.lanterns.forEach((l,i) => { if (!lit[i] && wave.peak[cell(l.x,l.y)] >= C.threshold) { lit[i] = true; renderer.burst(l.x,l.y,globalTime); sound.chime(lit.filter(Boolean).length - 1); refresh(); } });
+      level.lanterns.forEach((l,i) => { if (!lit[i] && wave.peak[cell(l.x,l.y)] >= C.threshold) { lit[i] = true; renderer.burst(l.x,l.y,globalTime); sound.chime(lit.filter(Boolean).length - 1,progress.cosmetics.lantern); refresh(); } });
       if (lit.every(Boolean)) { win(); break; }
       if (wave.stepNumber >= C.steps) {
         phase = 'ready';
         const hint = level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures;
         const weak = level.lanterns.map((l,i)=>({i,ratio:wave.peak[cell(l.x,l.y)]/C.threshold})).filter(p=>!lit[p.i]).sort((a,b)=>b.ratio-a.ratio)[0];
         renderer.failure=weak?.i ?? null;
+        sound.fail();
         setInstruction(attempts >= C.freeHelpFailures ? `${lit.filter(Boolean).length}/${lit.length} lit. Free guidance is available in Help.` : hint ? 'Two waves meeting make a BIG wave. Try the faint rings.' : weak?.ratio>=.7 ? `${lit.filter(Boolean).length}/${lit.length} lit. The marked lantern is close; shift a stone slightly.` : `${lit.filter(Boolean).length}/${lit.length} lit. Bring two ripples together by the marked lantern.`,true);
         refresh(); save(); break;
       }
@@ -420,6 +429,7 @@ function tick(dt) {
 }
 function frame(now) {
   const dt = Math.min(C.maxFrameDelta, (now - last) / 1000); last = now;
+  sound.update(phase);
   if (level && !paused()) { accumulator += dt; while (accumulator >= 1 / C.tickHz) { tick(1 / C.tickHz); accumulator -= 1 / C.tickHz; } }
   if (wave && level) {
     if (inventoryArtVersion !== renderer.artVersion) renderInventory();
@@ -554,6 +564,7 @@ $('settings-dialog').addEventListener('close', () => { syncPause(); refresh(); i
 $('settings-howto').onclick = () => { const returnToJournal = settingsReturnToJournal; settingsReturnToJournal = false; $('settings-dialog').close(); openControls(returnToJournal); };
 $('setting-sound').onchange = event => { if (portal.muteAudio) return; sound.muted = !event.target.checked; progress.muted = sound.muted; sound.unlock(); sound.sync(); save(); refresh(); };
 $('setting-ambience').onchange = event => { progress.preferences.ambientSound = event.target.checked; sound.ambientEnabled = event.target.checked; sound.sync(); save(); refresh(); };
+$('setting-music').onchange = event => { progress.preferences.musicEnabled = event.target.checked; sound.musicEnabled = event.target.checked; sound.sync(); save(); refresh(); };
 for (const [id,key] of [['setting-motion','reducedMotion'],['setting-contrast','highContrast'],['setting-dock','dockTop']]) $(id).onchange = event => { progress.preferences[key] = event.target.checked; applyPreferences(); save(); refresh(); };
 $('hint-token').onclick = () => { if (spend(progress,1)) { reveal(); $('hint-dialog').close(); save(); refresh(); } };
 $('hint-free').onclick = () => { if (attempts >= C.freeHelpFailures) { reveal(); $('hint-dialog').close(); save(); refresh(); } };
