@@ -35,7 +35,9 @@ try{
  checks.push('second pointer cannot steal a drag; pause rolls back and saves the original stone');
  await page.click('#drop');await page.waitForTimeout(500);await page.screenshot({path:'reports/waves.png'});await page.waitForFunction(()=>window.__ripple.state.phase==='complete');await page.screenshot({path:'reports/complete.png'});assert.equal(await page.evaluate(()=>window.__ripple.state.progress.stars.l1),3);await page.waitForFunction(()=>window.__ripple.state.step>=360);await page.screenshot({path:'reports/waves-fullscreen.png'});checks.push('first pond solve, stars and full-screen wave continuation');
  await page.click('#next');assert.equal(await page.evaluate(()=>window.__ripple.state.level.number),2);
+ await page.evaluate(()=>{window.adBreakCalls=[];window.__ripple.portal.ad=(type,count)=>{window.adBreakCalls.push({type,count,mode:window.__ripple.state.mode});return Promise.resolve(false);};});
  for(let n=2;n<=10;n++){if(n>2)await page.evaluate(n=>window.__ripple.go(n),n);await page.evaluate(()=>window.__ripple.solve());await page.waitForFunction(()=>window.__ripple.state.phase==='complete');assert.equal(await page.evaluate(()=>window.__ripple.state.lit.every(Boolean)),true);}
+ assert.deepEqual(await page.evaluate(()=>window.adBreakCalls),[{type:'midgame',count:5,mode:'campaign'},{type:'midgame',count:10,mode:'campaign'}]);
  assert.ok(await page.evaluate(()=>window.__ripple.state.progress.chapters[0]&&window.__ripple.state.progress.chapters[1]));checks.push('all ten scripted ponds completable; chapter rewards');
  await page.click('#result-journal');
  assert.equal(await page.locator('#collection-dialog').evaluate(e=>e.open),true);
@@ -113,6 +115,10 @@ try{
  await mock.evaluate(()=>{const p=window.__ripple.portal;p.launchStage='full';p.ads=true;p.boot-=180001;p.ad('rewarded');});assert.ok(await mock.locator('#app').evaluate(e=>e.inert));assert.ok(await mock.evaluate(()=>window.__ripple.state.paused));assert.equal(await mock.evaluate(()=>window.__ripple.sound.paused),false);
  await mock.evaluate(()=>window.adCallbacks.adStarted());assert.equal(await mock.evaluate(()=>window.__ripple.sound.paused),true);
  await mock.evaluate(()=>window.adCallbacks.adError({code:'unfilled'}));assert.equal(await mock.locator('#app').evaluate(e=>e.inert),false);assert.equal(await mock.evaluate(()=>window.__ripple.state.paused),false);
+ await mock.evaluate(()=>{window.__ripple.portal.lastAd=-Infinity;window.__ripple.solve();});await mock.waitForFunction(()=>window.__ripple.state.phase==='complete');
+ await mock.click('#double');await mock.evaluate(()=>window.adCallbacks.adError({code:'unfilled'}));
+ await mock.locator('#reward-toast-title').filter({hasText:'Ad unavailable'}).waitFor();
+ assert.equal(await mock.evaluate(()=>Boolean(window.__ripple.state.progress.doubled.l6)),false);
  checks.push('SDK cloud-first restore, portal mute, Basic ad suppression, request/input shield and unfilled recovery');await mock.close();
  const legacyContext=await browser.newContext();await legacyContext.addInitScript(()=>{if(!sessionStorage.getItem('legacy-fixture')){sessionStorage.setItem('legacy-fixture','1');localStorage.setItem('ripple-pond-v1',JSON.stringify({version:1,mode:'campaign',level:11,tutorialDone:true,campaign:{number:11,seed:11*7919,stones:[],attempts:1}}));}});
  const legacyPage=await legacyContext.newPage();await legacyPage.route('https://sdk.crazygames.com/**',r=>r.abort());

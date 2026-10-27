@@ -260,9 +260,9 @@ function renderShop() {
   }
 }
 let rewardToastTimer;
-function showRewardToast(title,detail) {
+function showRewardToast(title,detail,playSound=true) {
   const toast=$('reward-toast');clearTimeout(rewardToastTimer);
-  sound.unlock();sound.reward();
+  if(playSound){sound.unlock();sound.reward();}
   $('reward-toast-title').textContent=title;$('reward-toast-detail').textContent=detail;
   toast.hidden=false;toast.getAnimations().forEach(animation=>animation.cancel());
   if(!reducedMotion.matches&&!progress.preferences.reducedMotion) toast.animate([{opacity:0,transform:'translate(-50%,12px) scale(.96)'},{opacity:1,transform:'translate(-50%,0) scale(1)'}],{duration:360,easing:'cubic-bezier(.18,.8,.24,1)'});
@@ -398,8 +398,12 @@ function finishWin() {
   else { finishDaily(progress, dailyDay, dailyStage, result, stones.length);result.discoveries=readyDiscoveries(progress); }
   result.coinsGained=progress.tokens-coinsBefore;
   portal.happy(); syncPause(); refresh(); overlay(); save();
-  // Natural break only. A rewarded ad shares the same cooldown, so never chained.
-  if (result.first) portal.ad('midgame', Object.keys(progress.stars).length).then(() => refresh());
+  // Full Launch only: an occasional chapter finish, never a daily or replay.
+  // Rewarded offers share the SDK/local cooldown and cannot chain here.
+  if (result.first && mode === 'campaign' && level.number % C.chapterLength === 0) {
+    const completed = Object.keys(progress.stars).filter(key => /^l\d+$/.test(key)).length;
+    portal.ad('midgame', completed).then(() => refresh());
+  }
 }
 function tick(dt) {
   globalTime += dt; if (phase === 'ready' || phase === 'running') elapsed += dt;
@@ -533,7 +537,10 @@ async function reward(action) {
   $('hint-dialog').close(); $('collection-dialog').close(); syncPause();
   const success = await portal.ad('rewarded'); if (success) action();
   manualPause = wasManual; syncPause(); refresh(); overlay(); save();
-  if (!success) setInstruction('No ad available. Your stones and coins are safe.',true);
+  if (!success) {
+    if (phase === 'complete') showRewardToast('Ad unavailable','Continue or use coins instead',false);
+    else setInstruction('No ad available. Your stones and coins are safe.',true);
+  }
 }
 function reveal() { hintCount = Math.min(level.solution.length, hintCount + 1); setInstruction('A faint ring marks one solution stone. Match its delay if shown.',true); }
 function doubleStars() { const key = rewardKey(); if (!result || progress.doubled[key]) return; progress.doubled[key] = true; progress.bonus += result.stars; result.gained += result.stars; result.discoveries=readyDiscoveries(progress); }

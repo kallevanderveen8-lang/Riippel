@@ -1,6 +1,6 @@
 {
   "passed": true,
-  "firstContentfulPaintMs": 248,
+  "firstContentfulPaintMs": 128,
   "checks": [
     "initial interactive pond, SDK blocked",
     "pointer placement and mid-level restore",

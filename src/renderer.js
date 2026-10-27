@@ -394,11 +394,23 @@ export class Renderer {
     }
     for (let i = 0; i < level.rocks.length; i++) {
       const r = level.rocks[i];
-      ctx.save();ctx.translate(r.x,r.y);ctx.fillStyle='#061e2485';ctx.beginPath();ctx.ellipse(.35,.65,r.rx*1.04,r.ry*1.05,-.08,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle=this.timeOfDay==='night'?'#a3c5ce58':'#dcf1e772';ctx.lineWidth=.13;ctx.setLineDash([.65,1.3]);ctx.beginPath();ctx.ellipse(0,.12,r.rx*1.065,r.ry*1.07,-.08,.15,Math.PI-.12);ctx.stroke();ctx.setLineDash([]);ctx.restore();
-      ctx.save(); ctx.translate(r.x, r.y);
-      ctx.shadowColor = '#091d1bb0'; ctx.shadowBlur = 5 * this.dpr; ctx.shadowOffsetX = 1.5 * this.dpr; ctx.shadowOffsetY = 3 * this.dpr;
-      ctx.drawImage(boulder.complete && boulder.naturalWidth ? boulder : this.rocks[(i + 2) % this.rocks.length], -r.rx * 1.16, -r.ry * 1.16, r.rx * 2.32, r.ry * 2.32); ctx.restore();
+      ctx.save();ctx.translate(r.x,r.y);
+      // A diffused submerged footprint ties the dry top to the water without a hard oval cutout.
+      ctx.save();ctx.scale(r.rx,r.ry);
+      const depth=ctx.createRadialGradient(.03,.12,.45,.04,.16,1.28);
+      depth.addColorStop(0,'#071e22c7');depth.addColorStop(.68,'#0b30379e');depth.addColorStop(1,'#0c414600');
+      ctx.fillStyle=depth;ctx.fillRect(-1.3,-1.3,2.6,2.6);ctx.restore();
+      ctx.shadowColor='#051b20a8';ctx.shadowBlur=7*this.dpr;ctx.shadowOffsetX=.7*this.dpr;ctx.shadowOffsetY=2*this.dpr;
+      const art=boulder.complete&&boulder.naturalWidth?boulder:this.rocks[(i+2)%this.rocks.length];
+      ctx.save();
+      ctx.filter=this.timeOfDay==='night'?'brightness(.72) saturate(.82)':'brightness(.94) saturate(.9)';
+      if(r.ry>r.rx*1.2){ctx.rotate(Math.PI/2);ctx.drawImage(art,-r.ry*1.12,-r.rx*1.12,r.ry*2.24,r.rx*2.24);}
+      else if(r.rx>r.ry*1.2)ctx.drawImage(art,-r.rx*.96,-r.ry*1.38,r.rx*1.92,r.ry*2.76);
+      else ctx.drawImage(art,-r.rx*1.12,-r.ry*1.12,r.rx*2.24,r.ry*2.24);
+      ctx.restore();
+      ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+      ctx.strokeStyle=this.timeOfDay==='night'?'#91b9c04d':'#bfded06b';ctx.lineWidth=.12;
+      ctx.beginPath();ctx.ellipse(0,.09,r.rx*1.02,r.ry*1.02,-.08,.15,Math.PI-.12);ctx.stroke();ctx.restore();
     }
     for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     if (hover && !running && hover.x >= 7 && hover.x <= 121 && hover.y >= 7 && hover.y <= 121) {

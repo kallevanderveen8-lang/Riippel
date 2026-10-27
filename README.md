@@ -1,6 +1,6 @@
 # Ripple
 
-A calm wave-interference puzzle for **desktop browsers with mouse and keyboard**, built with **Canvas 2D + vanilla JavaScript**. Six photorealistic lake plates, small journal previews, a transparent stone atlas and an angular boulder are bundled locally as WebP images. There are no runtime packages or art downloads; sound is synthesized with WebAudio.
+A calm wave-interference puzzle for **desktop browsers with mouse and keyboard**, built with **Canvas 2D + vanilla JavaScript**. Six photorealistic lake plates, small journal previews, a transparent stone atlas and a weathered granite boulder are bundled locally as WebP images. There are no runtime packages or art downloads; sound is synthesized with WebAudio.
 
 The visual direction follows the supplied minimalist lake reference: natural teal water, intricate caustics, detailed shore rocks and mineral-textured stones. The lake fills the viewport. A small level identifier/title sits left, **Collection** is centered above the lake, and daily/sound/pause controls sit right. The logo and tagline are absent. Collection opens directly on ten level cards for the current lake; Today, Milestones, Day & night and Shop are secondary tabs. The supported release target is the ten CrazyGames desktop frames, from 800×450 to 1920×1080, plus a 3840×2160 presentation; mobile is outside the current release scope.
 
@@ -147,21 +147,22 @@ The separate UI suite checks keyboard play and timing edits, Undo and right-clic
 
 The current local validation runs unit, browser and UI checks in a disposable copy; the browser suite includes all ten CrazyGames desktop sizes and mocked SDK behavior. Earlier [passing CI run](https://github.com/kallevanderveen8-lang/Riippel/actions/runs/39792903212) covers the previous release, before the new imagery, Collection and camera controls.
 
-Inspected screenshots of the current desktop release: [lake](docs/desktop.png), [Collection](docs/collection.png) and [late Shop](docs/collector-shop.png). The standalone playtest has separate local saves and no SDK/ad requests.
+Inspected screenshots of the current desktop release: [lake](docs/desktop.png), [rocky lake](docs/rocks.png), [night rocks](docs/rocks-night.png), [Collection](docs/collection.png) and [late Shop](docs/collector-shop.png). The standalone playtest has separate local saves and no SDK/ad requests.
 
-## CrazyGames integration (official docs checked 22 October 2026)
+## CrazyGames integration (ad docs rechecked 27 October 2026)
 
 `src/sdk.js` loads the official v3 SDK asynchronously. It awaits `init()` with a timeout and only uses supported `local` / `crazygames` environments. A blocked or unavailable SDK leaves a playable local game. Loading events, gameplay start/stop, happytime, feedback context and a completion milestone (the first 30 lakes) are integrated. Tab hiding pauses local audio/physics, while the SDK handles its own tab lifecycle.
 
 - Basic Launch is the default and has **no monetization**. The separately built Full Launch package enables offers only when the SDK ad module is available and no adblock is detected.
-- No ad request in the first 180 seconds. A shared 180-second cooldown prevents ad chains. Midgame requests occur only on a first-completion result screen and at least five newly solved lakes apart.
+- No ad request in the first 180 seconds. A shared 180-second cooldown prevents ad chains. Full Launch midgame requests occur only after a first-time campaign chapter finish, at least five uniquely solved levels apart. The SDK controls whether a request actually displays an ad.
 - Rewarded offers live in a paused hint/collection dialog or the result screen, with clear `Watch ad` labels. Continue/dismiss choices are immediately available and equally sized/styled. Hints, star doubling and a daily-goal reroll also have earned-credit alternatives.
 - All app input becomes inert from request through finish/error. Audio mutes on **adStarted**, not at request. Unfilled/error/throw/request timeout/playback timeout recover; callbacks received after completion are ignored. Only `adFinished` grants a reward once.
 - `game.settings.muteAudio` and its change listener override the in-game audio toggle. WebAudio also resumes from suspended/interrupted states on a user gesture.
 - After SDK initialization, Data is the exclusive backend. The initial cloud/guest read is captured before writes and reconciled before enabling writes. Standalone local progress can migrate on first use; the SDK handles guest/account switching and reload. Select **Yes, using the Data Module** in the submission.
-- No ads, trackers, third-party assets or network calls other than the official SDK. No Escape/Ctrl+W bindings.
+- No trackers, third-party assets or network calls other than the official SDK. No Escape/Ctrl+W bindings.
 
 Read [docs/crazygames-release.md](docs/crazygames-release.md) for the portal test checklist and retention measurement plan. Passing repository tests does not mean CrazyGames approval or proven retention. Real ads, guest/account sync and device audio interruptions need the portal preview and physical-device testing.
+The [rock and ad review](docs/rock-and-ads.md) explains the quieter boulder treatment and Full Launch advertisement cadence.
 For uncoached player sessions and release metrics, use [docs/retention-playtest.md](docs/retention-playtest.md).
 
 Official references: [SDK initialization](https://docs.crazygames.com/sdk/intro/), [game events/settings](https://docs.crazygames.com/sdk/game/), [video ads](https://docs.crazygames.com/sdk/video-ads/), [advertisement requirements](https://docs.crazygames.com/requirements/ads/), [Data](https://docs.crazygames.com/sdk/data/), [quality](https://docs.crazygames.com/requirements/quality/), [gameplay/responsive sizes](https://docs.crazygames.com/requirements/gameplay/), [puzzle monetization](https://docs.crazygames.com/resources/monetizing-puzzle/).

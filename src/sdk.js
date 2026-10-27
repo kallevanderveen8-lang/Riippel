@@ -69,7 +69,7 @@ export class Portal {
         this.sdk.ad.requestAd(type, {
           adStarted: () => { if (done) return; clearTimeout(timer); timer = setTimeout(() => finish(false), C.adTimeoutMs); this.onAdState({ busy: true, playing: true }); },
           adFinished: () => finish(true),
-          adError: error => { if (done) return; if (['adblock','adsDisabledBasicLaunch'].includes(error?.code)) this.ads = false; finish(false); }
+          adError: error => { if (done) return; if (['adblock','adsDisabled','adsDisabledBasicLaunch'].includes(error?.code)) this.ads = false; finish(false); }
         });
       } catch { finish(false); }
     });
