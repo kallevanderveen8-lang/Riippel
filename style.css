@@ -334,8 +334,13 @@ dialog::backdrop{background:#041b23b8;backdrop-filter:blur(9px)}
 .daily-teaser{min-height:182px;border-color:#c5dcc253;background-image:linear-gradient(90deg,#0b2b34ef,#0b343bb3),var(--menu-scene);background-size:cover;background-position:center;padding:28px 31px}
 #panel-today{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px 30px;align-items:start}
 #panel-today[hidden]{display:none}
-#panel-today .daily-teaser{min-height:292px}
-#panel-today .daily-goals{margin:0}
+#panel-today .daily-teaser{min-height:216px;padding:21px 25px}
+#panel-today .daily-goals{margin:0;grid-column:1/-1}
+.weekly-teaser{display:flex;flex-direction:column;justify-content:space-between;gap:6px;min-height:216px;padding:18px 25px;border:1px solid #d8c89780;border-radius:12px;background:linear-gradient(145deg,#233e3bd9,#0b3038e8),var(--menu-scene);background-size:cover;background-position:center;color:#f2eee1}
+.weekly-teaser h3{font:400 1.55rem Georgia,serif;margin:4px 0 0}
+.weekly-teaser p{font-size:.8125rem;line-height:1.45;color:#dfebdc;margin:6px 0 4px}
+.weekly-teaser small{display:block;font-size:.75rem;line-height:1.4;color:#c3d4c8}
+.weekly-teaser .primary{align-self:flex-start}
 #token-balance{display:none}
 .daily-teaser h3{font:400 1.8rem Georgia,serif;color:#f2ede0}
 .daily-teaser p{max-width:55ch;color:#dce8db;font-size:.875rem}
@@ -364,6 +369,10 @@ dialog::backdrop{background:#041b23b8;backdrop-filter:blur(9px)}
 .result-stats{background:#08262b8c;border-color:#9bb8a864}
 .settings-body{padding-top:18px;padding-bottom:20px}
 #settings-dialog{width:min(690px,calc(100% - 40px))}
+#new-player-dialog{width:min(510px,calc(100% - 40px))}
+#new-player-dialog .dialog-body p{margin:0;line-height:1.6;color:#dce7d9}
+#new-player-dialog .dialog-footer{justify-content:flex-end}
+#new-player{margin-top:10px;width:100%;text-align:left;color:#ebd5b8}
 .settings-section+.settings-section{margin-top:16px}
 .settings-group-label{margin:0;font:650 .6875rem/1.4 system-ui,sans-serif;letter-spacing:.18em;color:#d2c796}
 .settings-list{margin-top:7px;border-top:1px solid #9ebeb054}
@@ -409,7 +418,7 @@ dialog::backdrop{background:#041b23b8;backdrop-filter:blur(9px)}
 .user-high-contrast #tutorial-tip{background:#08282b;border-color:#f6eee0}
 @media(max-width:900px){
   .guide-steps{grid-template-columns:1fr}.guide-steps li{padding:11px 0}.guide-steps li+li{padding-left:0;border-left:0;border-top:1px solid #a5c5b85e}
-  #panel-today{display:block}#panel-today .daily-teaser{min-height:0}#panel-today .daily-goals{margin-top:20px}
+  #panel-today{display:block}#panel-today .daily-teaser{min-height:0}#panel-today .weekly-teaser{min-height:0;margin-top:20px}#panel-today .daily-goals{margin-top:20px}
   #collection-dialog{width:calc(100% - 24px)}
   .journal-sidebar{padding:0 19px}.journal-tabs button{padding:10px 12px;gap:7px}.journal-summary{display:none}
   #journal-body{padding:20px 23px 25px}.dialog-footer{padding:12px 22px}.dialog-header{padding-left:23px;padding-right:23px}

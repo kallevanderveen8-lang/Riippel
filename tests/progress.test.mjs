@@ -90,8 +90,9 @@ test('future cosmetics stay locked while earned postcards remain claimable',()=>
  assert.equal(buyCosmetic(p,'stones','quartz'),false);assert.equal(p.tokens,100);
  assert.equal(buyCosmetic(p,'stones','void'),false);
  p.level=21;assert.equal(buyCosmetic(p,'stones','quartz'),true);assert.equal(p.tokens,86);
- p.level=121;p.tokens=299;assert.equal(buyCosmetic(p,'stones','void'),false);p.tokens=300;assert.equal(buyCosmetic(p,'stones','void'),true);assert.equal(p.tokens,0);
- for(let n=1;n<=10;n++)p.stars[`l${n}`]=2;
+ p.level=121;p.tokens=400;assert.equal(buyCosmetic(p,'stones','void'),false);
+ for(let n=1;n<=120;n++)p.stars[`l${n}`]=3;
+ assert.equal(buyCosmetic(p,'stones','void'),true);assert.equal(p.tokens,0);
  assert.equal(discoveries(p).find(d=>d.id==='postcard-0').ready,true);
  assert.equal(claimDiscovery(p,'postcard-0').reward,2);
  assert.equal(claimDiscovery(p,'postcard-0'),null);

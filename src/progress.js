@@ -1,17 +1,20 @@
 import { C, lakeForLevel } from './config.js';
 import { daySeed } from './simulation.js';
-export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, mastery: {}, lakeRewards: {}, discoveries: {}, records: {}, tokens: C.initialTokens, theme: 0, lakeLights: {}, cosmetics: {stones:['river'],lanterns:['bronze'],stone:'river',lantern:'bronze'}, dailyGift:{lastDay:0,streak:0,total:0}, muted: false, tutorialDone: false, preferences: { ambientSound: true, musicEnabled: true, reducedMotion: false, highContrast: false, dockTop: false }, campaign: null, daily: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
+import { weeklyScore } from './weekly.js';
+export function freshProgress() { return { version: C.version, mode: 'campaign', level: 1, stars: {}, bonus: 0, doubled: {}, chapters: {}, mastery: {}, lakeRewards: {}, discoveries: {}, records: {}, weeklyBest: {}, weeklyRewards: {}, tokens: C.initialTokens, theme: 0, lakeLights: {}, cosmetics: {stones:['river'],lanterns:['bronze'],stone:'river',lantern:'bronze'}, dailyGift:{lastDay:0,streak:0,total:0}, muted: false, tutorialDone: false, preferences: { ambientSound: true, musicEnabled: true, reducedMotion: false, highContrast: false, dockTop: false }, campaign: null, daily: null, weekly: null, dailyTrail: null, dailyResults: {}, streak: 0, lastDaily: 0, goals: { day: daySeed(), solves: [], three: false, clean: false, claimed: [], rerolled: false } }; }
 export function parseProgress(raw) {
   try {
     const p = JSON.parse(raw); if (!p || p.version !== C.version) return freshProgress();
     const out = { ...freshProgress(), ...p };
     out.level = Math.max(1, Math.min(10000, Math.floor(Number(out.level) || 1)));
-    out.mode = out.mode === 'daily' && out.level > C.dailyUnlock ? 'daily' : 'campaign';
+    out.mode = out.mode === 'daily' && out.level > C.dailyUnlock || out.mode === 'weekly' && out.level > C.weeklyUnlock ? out.mode : 'campaign';
     out.theme = Math.max(0, Math.min(C.themes.length - 1, Math.floor(Number(out.theme) || 0)));
     out.tutorialDone = Object.hasOwn(p, 'tutorialDone') ? !!p.tutorialDone : out.level > 1 || !!p.stars?.l1 || !!p.campaign;
     out.preferences = { ambientSound: p.preferences?.ambientSound !== false, musicEnabled: p.preferences?.musicEnabled !== false && (p.preferences?.musicEnabled !== undefined || p.preferences?.ambientSound !== false), reducedMotion: !!p.preferences?.reducedMotion, highContrast: !!p.preferences?.highContrast, dockTop: !!p.preferences?.dockTop };
     out.bonus = Math.max(0, Number(out.bonus) || 0); out.tokens = Math.max(0, Math.min(C.maxTokens, Math.floor(Number(out.tokens) || 0)));
-    for (const key of ['stars','doubled','dailyResults','chapters','mastery','lakeRewards','discoveries','records']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
+    for (const key of ['stars','doubled','dailyResults','chapters','mastery','lakeRewards','discoveries','records','weeklyBest','weeklyRewards']) if (!out[key] || typeof out[key] !== 'object' || Array.isArray(out[key])) out[key] = {};
+    out.weeklyBest = Object.fromEntries(Object.entries(out.weeklyBest).filter(([week,best])=>Number.isSafeInteger(Number(week))&&best&&Number.isInteger(best.stars)&&best.stars>=1&&best.stars<=3&&Number.isFinite(best.seconds)&&best.seconds>=0).map(([week,best])=>[week,{stars:best.stars,seconds:best.seconds,score:weeklyScore(best.stars,best.seconds)}]));
+    out.weeklyRewards = Object.fromEntries(Object.entries(out.weeklyRewards).filter(([week,value])=>Number.isSafeInteger(Number(week))&&(value===1||value===3)));
     // Old saves earned landscape choices by stars. Keep their progress, but the
     // location now follows the level; only lighting and owned cosmetics are chosen.
     out.lakeLights = Object.fromEntries(Object.entries(p.lakeLights || {}).filter(([key,value])=>/^\d{1,4}$/.test(key)&&(value==='day'||value==='night')));
@@ -77,6 +80,9 @@ export function discoveries(p) {
     { id:'hundred-lakes', name:'The long way home', detail:'Complete 100 journey lakes', value:campaign.length, target:100, reward:8 },
     { id:'twenty-five-perfect', name:'A steady hand', detail:'Earn 3 stars on 25 lakes', value:perfect, target:25, reward:5 },
     { id:'fifty-perfect', name:'Every ripple counts', detail:'Earn 3 stars on 50 lakes', value:perfect, target:50, reward:7 },
+    { id:'sixty-perfect', name:'Six still shores', detail:'Earn 3 stars on 60 journey levels', value:perfect, target:60, reward:6 },
+    { id:'hundred-perfect', name:'An unbroken reflection', detail:'Earn 3 stars on 100 journey levels', value:perfect, target:100, reward:8 },
+    { id:'all-perfect', name:'Every shore in harmony', detail:'Earn 3 stars on all 120 featured levels', value:perfect, target:120, reward:12 },
     { id:'first-trail', name:'A day by the water', detail:'Finish 1 daily trail', value:trails, target:1, reward:2 },
     { id:'fourteen-trails', name:'Two weeks of lakes', detail:'Finish daily trails on 14 days', value:trails, target:14, reward:6 },
     { id:'thirty-trails', name:'A month of lakes', detail:'Finish daily trails on 30 days', value:trails, target:30, reward:8 },
@@ -115,10 +121,15 @@ export function claimDailyGift(p, day = daySeed()) {
 export function buyCosmetic(p,kind,id) {
   const catalog=C.cosmetics[kind];
   const item=catalog?.find(entry=>entry.id===id);
-  if (!item || p.level < (item.unlockLevel || 1) || p.cosmetics[kind].includes(id) || !spend(p,item.cost)) return false;
+  if (!item || cosmeticLock(p,item) || p.cosmetics[kind].includes(id) || !spend(p,item.cost)) return false;
   p.cosmetics[kind].push(id);
   p.cosmetics[kind==='stones'?'stone':'lantern']=id;
   return true;
+}
+export function cosmeticLock(p,item) {
+  if (p.level < (item.unlockLevel || 1)) return `Level ${item.unlockLevel}`;
+  if (item.perfectThrough && !Array.from({length:item.perfectThrough},(_,i)=>p.stars[`l${i+1}`]===3).every(Boolean)) return `3★ on levels 1–${item.perfectThrough}`;
+  return null;
 }
 export function equipCosmetic(p,kind,id) {
   if (!C.cosmetics[kind]?.some(item=>item.id===id) || !p.cosmetics[kind].includes(id)) return false;

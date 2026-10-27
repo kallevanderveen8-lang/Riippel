@@ -10,7 +10,7 @@ export const C = Object.freeze({
   themeStars: 10, hintFailures: 2, rewardedFailures: 3, masteryTokens: 2, guidedHelpFailures: 6,
   firstAdSeconds: 180, adIntervalSeconds: 180, adEveryLevels: 5,
   adTimeoutMs: 90000, sdkTimeoutMs: 2500, saveKey: 'ripple-pond-v1',
-  winSeconds: 1.0, burstSeconds: 1.05, bubbleSeconds: 0.48, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyOpeningVersion: 3, dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], recordLimit: 300, maxTokens: 999, firstFreeHelpFailures: 2, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
+  winSeconds: 1.0, burstSeconds: 1.05, bubbleSeconds: 0.48, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyOpeningVersion: 3, dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], weeklyLevel: 12, weeklyUnlock: 5, weeklyLeaderboard: { enabled: false, encryptionKey: '' }, recordLimit: 300, maxTokens: 999, firstFreeHelpFailures: 2, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, lakeSkipCost: 3, solverBudget: 24, benchmarkCount: 300,
   cosmetics: {
     stones: [
@@ -22,14 +22,14 @@ export const C = Object.freeze({
       { id:'potato', name:'Tiny potato', cost:18, kind:'Playful' },
       { id:'moss', name:'Moss stone', cost:10, kind:'Natural', unlockLevel:11 },
       { id:'quartz', name:'Blue quartz', cost:14, kind:'Natural', unlockLevel:21 },
-      { id:'opal', name:'Opal stone', cost:20, kind:'Natural', unlockLevel:31 },
+      { id:'opal', name:'Opal stone', cost:35, kind:'Natural', unlockLevel:31, perfectThrough:30 },
       { id:'duck', name:'Duck pebble', cost:25, kind:'Playful', unlockLevel:41 },
       { id:'bread', name:'Little loaf', cost:35, kind:'Playful', unlockLevel:61 },
       { id:'cosmic', name:'Cosmic stone', cost:45, kind:'Playful', unlockLevel:91 },
       { id:'missing', name:'404 pebble', cost:65, kind:'Internet oddity', unlockLevel:51 },
       { id:'loading', name:'Loading pebble', cost:95, kind:'Internet oddity', unlockLevel:71 },
-      { id:'royal-duck', name:'Royal duck', cost:180, kind:'Collector', unlockLevel:101 },
-      { id:'void', name:'Tiny black hole', cost:300, kind:'Collector', unlockLevel:121 }
+      { id:'royal-duck', name:'Royal duck', cost:220, kind:'Collector', unlockLevel:101, perfectThrough:60 },
+      { id:'void', name:'Tiny black hole', cost:400, kind:'Collector', unlockLevel:121, perfectThrough:120 }
     ],
     lanterns: [
       { id:'bronze', name:'Bronze lantern', cost:0, kind:'Classic' },
@@ -38,11 +38,11 @@ export const C = Object.freeze({
       { id:'firefly', name:'Firefly lantern', cost:14, kind:'Warm' },
       { id:'copper', name:'Copper lantern', cost:12, kind:'Warm', unlockLevel:21 },
       { id:'lotus', name:'Lotus lantern', cost:18, kind:'Natural', unlockLevel:31 },
-      { id:'star', name:'Starlight lantern', cost:25, kind:'Cool', unlockLevel:51 },
-      { id:'moon', name:'Moonstone lantern', cost:32, kind:'Cool', unlockLevel:81 },
+      { id:'star', name:'Starlight lantern', cost:40, kind:'Cool', unlockLevel:51, perfectThrough:30 },
+      { id:'moon', name:'Moonstone lantern', cost:70, kind:'Cool', unlockLevel:81, perfectThrough:60 },
       { id:'signal', name:'Signal lantern', cost:75, kind:'Internet oddity', unlockLevel:61 },
       { id:'sunflower', name:'Sunflower lantern', cost:125, kind:'Natural', unlockLevel:81 },
-      { id:'aurora', name:'Aurora lantern', cost:220, kind:'Collector', unlockLevel:111 }
+      { id:'aurora', name:'Aurora lantern', cost:280, kind:'Collector', unlockLevel:111, perfectThrough:120 }
     ]
   },
   themes: [

@@ -6,7 +6,8 @@ import { CURATED } from './curated.js';
 import { Renderer } from './renderer.js';
 import { Sound } from './audio.js';
 import { Portal } from './sdk.js';
-import { parseProgress, totalStars, goals, complete, rollDay, masteryTarget, discoveries, readyDiscoveries, claimDiscovery, lightForLake, setLakeLight, claimDailyGift, buyCosmetic, equipCosmetic, spend, buyNextLake, dailyRun, finishDaily } from './progress.js';
+import { freshProgress, parseProgress, totalStars, goals, complete, rollDay, masteryTarget, discoveries, readyDiscoveries, claimDiscovery, lightForLake, setLakeLight, claimDailyGift, buyCosmetic, equipCosmetic, cosmeticLock, spend, buyNextLake, dailyRun, finishDaily } from './progress.js';
+import { weeklyId, weeklySeed, weeklyStart, weeklyStars, weeklyTime, recordWeekly } from './weekly.js';
 
 const $ = id => document.getElementById(id), canvas = $('pond'), sound = new Sound(), renderer = new Renderer(canvas);
 const iconPaths = {
@@ -33,14 +34,14 @@ function icon(name, className='') {
 }
 function action(id,text,name,leading=false) { const label=document.createElement('span');label.textContent=text;$(id).replaceChildren(...(leading?[icon(name),label]:[label,icon(name)])); }
 for(const placeholder of document.querySelectorAll('[data-icon]'))placeholder.replaceChildren(icon(placeholder.dataset.icon));
-let adPlaying = false, collectionPage = 0, adPaused = false, manualPause = false, hidden = document.hidden, touched = false, loading = false;
+let adPlaying = false, collectionPage = 0, adPaused = false, manualPause = false, hidden = document.hidden, loading = false;
 const portal = new Portal(state => {
   adPaused = state.busy; adPlaying = state.playing; $('app').inert = state.busy;
   $('ad-shield').hidden = !state.busy; $('ad-shield').textContent = state.playing ? 'Advertisement' : 'Advertisement loading…';
   syncPause(); refresh();
 }, muted => { sound.portalMuted = muted; sound.sync(); refresh(); });
-let progress = parseProgress(portal.read()), mode = progress.mode, dailyDay = daySeed(), dailyStage = 0;
-let level, wave, stones = [], lit = [], phase = 'ready', attempts = 0, resetUsed = false, elapsed = 0, result = null, celebration = 0, hintCount = 0;
+let progress = parseProgress(portal.read()), mode = progress.mode, dailyDay = daySeed(), dailyStage = 0, weeklyWeek = weeklyId();
+let level, wave, stones = [], lit = [], phase = 'ready', attempts = 0, resetUsed = false, elapsed = 0, weeklySeconds = 0, result = null, celebration = 0, hintCount = 0;
 let globalTime = 0, last = performance.now(), accumulator = 0, hover = null, pointer = null, debug = false, drops = 0, frameCount = 0;
 let journalTab = 'lakes', keyboardPoint = {x:64,y:64}, tutorialActive = false;
 let undoStack=[],lastPlacement=[];
@@ -65,7 +66,7 @@ function fetchLevel(number, seed = number * 7919, daily = false, legacy = false)
   }).catch(() => generate(number, seed, daily, legacy)));
   return cache.get(key);
 }
-function snapshot() { return { number: level.number, seed: level.seed, generatorVersion: level.generatorVersion || 2, day: mode === 'daily' ? dailyDay : null, stage: dailyStage, stones, attempts, resetUsed, elapsed, hintCount, completed: phase === 'complete', result }; }
+function snapshot() { return { number: level.number, seed: level.seed, generatorVersion: level.generatorVersion || 2, day: mode === 'daily' ? dailyDay : null, week: mode === 'weekly' ? weeklyWeek : null, stage: dailyStage, stones, attempts, resetUsed, elapsed, weeklySeconds, hintCount, completed: phase === 'complete', result }; }
 function save() {
   if (level) progress[mode] = snapshot();
   progress.mode = mode; progress.muted = sound.muted;
@@ -190,24 +191,24 @@ function maybeShowWelcome() {
 async function enter(newMode = mode) {
   if (level) save(); loading = true; $('loading-status').hidden = false; portal.setLoading(true); syncPause();
   mode = newMode; const saved = progress[mode];
-  dailyDay = daySeed();
+  dailyDay = daySeed(); weeklyWeek = weeklyId();
   dailyStage = mode === 'daily' ? (saved?.day === dailyDay && !saved.completed ? Math.max(0, Math.min(C.dailyLength - 1, saved.stage || 0)) : dailyRun(progress, dailyDay).stage) : 0;
-  const number = mode === 'daily' ? C.dailyLevels[dailyStage] : saved?.number || progress.level;
-  const restore = saved && (mode !== 'daily' || saved.day === dailyDay && saved.stage === dailyStage);
-  const seed = mode === 'daily' ? (Math.imul(dailyDay, 2654435761) + dailyStage * 7919) >>> 0 : number * 7919;
+  const number = mode === 'daily' ? C.dailyLevels[dailyStage] : mode === 'weekly' ? C.weeklyLevel : saved?.number || progress.level;
+  const restore = saved && (mode === 'daily' ? saved.day === dailyDay && saved.stage === dailyStage : mode === 'weekly' ? saved.week === weeklyWeek : true);
+  const seed = mode === 'daily' ? (Math.imul(dailyDay, 2654435761) + dailyStage * 7919) >>> 0 : mode === 'weekly' ? weeklySeed(weeklyWeek) : number * 7919;
   const oldDailyOpening = !!(mode === 'daily' && dailyStage === 0 && restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) < C.dailyOpeningVersion);
   const legacy = oldDailyOpening || !!(restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) === 1 && number > SCRIPTED.length);
-  level = await fetchLevel(number, seed, mode === 'daily', legacy);
+  level = await fetchLevel(number, seed, mode !== 'campaign', legacy);
   level.generatorVersion = oldDailyOpening ? saved.generatorVersion || 2 : mode === 'daily' && dailyStage === 0 ? C.dailyOpeningVersion : legacy ? 1 : 2;
   wave = new Wave(level.rocks);
   wave.peakIndices = level.lanterns.map(l => cell(l.x,l.y));
   stones = restore && Array.isArray(saved.stones) ? saved.stones.slice(0, level.limit).map(s => ({ x: Math.round(Number(s.x)), y: Math.round(Number(s.y)), delay: Math.max(0, Math.min(C.maxDelay, Math.floor(Number(s.delay) || 0))) })).filter((s,i,all) => Number.isFinite(s.x) && Number.isFinite(s.y) && canPlace(s, level, all.slice(0,i))) : [];
   lit = level.lanterns.map(() => false); attempts = restore ? Number(saved.attempts) || 0 : 0; resetUsed = restore ? !!saved.resetUsed : false;
-  elapsed = restore ? Number(saved.elapsed) || 0 : 0; hintCount = restore ? Number(saved.hintCount) || 0 : 0; result = restore ? saved.result : null;
+  elapsed = restore ? Number(saved.elapsed) || 0 : 0; weeklySeconds = restore ? Number(saved.weeklySeconds) || 0 : 0; hintCount = restore ? Number(saved.hintCount) || 0 : 0; result = restore ? saved.result : null;
   phase = restore && saved.completed ? 'complete' : 'ready'; if (phase === 'complete') lit.fill(true);
   undoStack=[];lastPlacement=stones.map(s=>({...s}));
   pointer = null; hover = null; keyboardPoint = {x:64,y:64}; celebration = 0; renderer.zoom = 0; renderer.resetCamera(); renderer.bursts = []; renderer.failure = null; loading = false; $('loading-status').hidden = true; portal.setLoading(false);
-  portal.context({ level: number, mode, dailyStage: mode === 'daily' ? dailyStage + 1 : 0 });
+  portal.context({ level: number, mode, dailyStage: mode === 'daily' ? dailyStage + 1 : 0, week: mode === 'weekly' ? weeklyWeek : undefined });
   const newMechanic = mode === 'campaign' && [2,3,7,C.delayUnlock].includes(number) && !progress.stars[`l${number}`] && attempts === 0 && stones.length === 0 && phase === 'ready';
   applyTheme(); applyPreferences(); setInstruction(defaultInstruction(),newMechanic,newMechanic); refresh(); overlay(); syncPause(); save(); maybeShowWelcome();
   if (mode === 'campaign') {
@@ -256,7 +257,7 @@ function renderShop() {
     group.className='shop-group';heading.textContent=label;grid.className='shop-grid';group.append(heading,grid);
     for(const item of C.cosmetics[kind].filter(item=>!item.unlockLevel || item.unlockLevel<=progress.level+10)) {
       const owned=progress.cosmetics[kind].includes(item.id),selected=progress.cosmetics[kind==='stones'?'stone':'lantern']===item.id;
-      const locked=progress.level<(item.unlockLevel||1);
+      const lock=cosmeticLock(progress,item),locked=!!lock;
       const card=document.createElement('div'),image=document.createElement('img'),meta=document.createElement('div'),name=document.createElement('strong'),type=document.createElement('small'),button=document.createElement('button');
       card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);card.classList.toggle('locked',locked);card.classList.toggle('collector',item.kind==='Collector');
       image.alt='';image.loading='lazy';
@@ -266,9 +267,9 @@ function renderShop() {
         image.src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
         previews.push(()=>{if(image.isConnected)image.src=renderer.cosmeticPreview(kind,item.id);});
       }
-      name.textContent=item.name;type.textContent=locked?`${item.kind} · ${item.cost} coins`:item.kind;meta.append(name,type);
-      button.textContent=selected?'Equipped':owned?'Equip':locked?`Level ${item.unlockLevel}`:`${item.cost} coins`;
-      button.disabled=selected||locked||(!owned&&progress.tokens<item.cost);button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':locked?`Unlocks at level ${item.unlockLevel}`:`Buy for ${item.cost} coins`}: ${item.name}`);
+      name.textContent=item.name;type.textContent=`${item.kind} · ${item.cost} coins`;meta.append(name,type);
+      button.textContent=selected?'Equipped':owned?'Equip':locked?lock:`${item.cost} coins`;
+      button.disabled=selected||(!owned&&(locked||progress.tokens<item.cost));button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':locked?`Unlock by reaching ${lock}`:`Buy for ${item.cost} coins`}: ${item.name}`);
       button.onclick=()=>{
         const success=owned?equipCosmetic(progress,kind,item.id):buyCosmetic(progress,kind,item.id);
         if(!success)return;
@@ -303,10 +304,10 @@ function showRewardToast(title,detail,playSound=true) {
 function refresh() {
   if (!level) return;
   const total = totalStars(progress);
-  $('level-label').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage + 1} / ${C.dailyLength}` : `LEVEL ${String(level.number).padStart(2,'0')}`;
+  $('level-label').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage + 1} / ${C.dailyLength}` : mode === 'weekly' ? 'WEEKLY PUZZLE' : `LEVEL ${String(level.number).padStart(2,'0')}`;
   $('level-name').textContent = level.name;
   const lake=lakeForLevel(level.number),solved=Array.from({length:C.lakeLength},(_,i)=>progress.stars[`l${lake.first+i}`]).filter(Boolean).length;
-  $('chapter-progress').textContent = mode === 'daily' ? `${new Date(dailyDay * 86400000).toISOString().slice(0,10)} · Shared daily trail` : `${lake.name} · ${solved} of ${C.lakeLength} levels complete`;
+  $('chapter-progress').textContent = mode === 'daily' ? `${new Date(dailyDay * 86400000).toISOString().slice(0,10)} · Shared daily trail` : mode === 'weekly' ? 'Stars first · Fastest time breaks ties' : `${lake.name} · ${solved} of ${C.lakeLength} levels complete`;
   $('app').classList.toggle('is-watching', phase === 'running' || phase === 'celebrate'); $('par').textContent = `PAR ${level.par}`;
   renderInventory();
   $('attempt-label').textContent = attempts ? `Drop ${attempts}` : 'Take your time';
@@ -330,6 +331,11 @@ function refresh() {
   $('journal-daily').textContent = mode==='daily'?'Return to journey':progress.level <= C.dailyUnlock ? 'Unlocks after level 3' : todayDone ? 'Replay today’s trail' : todayQuick ? 'Continue daily trail' : 'Play today’s puzzle';
   $('daily-title').textContent = todayQuick ? 'Today’s ripple ✓' : 'One daily ripple';
   $('daily-teaser').textContent = progress.level > C.dailyUnlock ? (todayDone ? 'Trail complete · New puzzle at 00:00 UTC.' : todayQuick ? 'Daily puzzle complete. Two more in the optional trail.' : 'One quick puzzle for a coin. Continue for a three-puzzle trail.') : 'Unlocks after level 3.';
+  const week=weeklyId(), best=progress.weeklyBest[week];
+  $('weekly-teaser').textContent = progress.level <= C.weeklyUnlock ? 'Unlocks after level 5.' : best ? `Your best: ${best.stars}★ · ${weeklyTime(best.seconds)}. Stars rank first, then time.` : 'One shared puzzle all week. Earn three stars, then chase your fastest time.';
+  $('journal-weekly').disabled = mode!=='weekly' && progress.level <= C.weeklyUnlock;
+  $('journal-weekly').textContent = mode==='weekly' ? 'Return to journey' : progress.level <= C.weeklyUnlock ? 'Unlocks after level 5' : best ? 'Improve weekly time' : 'Play weekly puzzle';
+  $('weekly-leaderboard').textContent = portal.leaderboardReady() ? 'CrazyGames board resets Monday at 09:00 UTC.' : 'CrazyGames ranking is not active yet.';
   $('jump-keepsakes').classList.toggle('has-reward',readyDiscoveries(progress).length>0);
   $('sound').disabled = !!portal.muteAudio; $('sound').title = portal.muteAudio ? 'Muted by CrazyGames' : '';
   $('sound').classList.toggle('is-muted',sound.muted || portal.muteAudio);
@@ -341,11 +347,11 @@ function refresh() {
   $('setting-sound-note').classList.toggle('sr-only',!portal.muteAudio);
   $('setting-ambience').disabled = sound.muted || !!portal.muteAudio;
   $('setting-music').disabled = sound.muted || !!portal.muteAudio;
-  $('settings-context').textContent = mode === 'daily' ? `Daily trail · Puzzle ${dailyStage + 1}` : `Level ${String(level.number).padStart(2,'0')} · ${lake.name}`;
+  $('settings-context').textContent = mode === 'daily' ? `Daily trail · Puzzle ${dailyStage + 1}` : mode === 'weekly' ? 'Weekly puzzle' : `Level ${String(level.number).padStart(2,'0')} · ${lake.name}`;
   $('pause').setAttribute('aria-label',manualPause ? 'Resume game' : 'Pause game');
   $('pause').setAttribute('aria-pressed',String(manualPause));
   $('sound').dataset.tooltip = $('sound').getAttribute('aria-label'); $('pause').dataset.tooltip = $('pause').getAttribute('aria-label');
-  const ads = portal.eligible(), canDouble = !manualPause && phase === 'complete' && !progress.doubled[rewardKey()];
+  const ads = portal.eligible(), canDouble = mode !== 'weekly' && !manualPause && phase === 'complete' && !progress.doubled[rewardKey()];
   const allHints = hintCount >= level.solution.length || (level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures);
   const freeHint = !allHints && attempts >= C.firstFreeHelpFailures && (hintCount === 0 || attempts >= C.freeHelpFailures);
   $('hint').hidden = !(attempts >= C.hintFailures && phase === 'ready');
@@ -395,15 +401,15 @@ function overlay() {
   $('overlay-text').hidden = false;
   $('replay').hidden = false; action('replay','Play again','reset',true); $('replay').title = (result?.stars || 3) < 3 ? `Aim for ${level.par} stones to earn three stars` : 'Replay to beat your record';
   action('result-journal','Collection','journal',true);
-  $('overlay-kicker').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage+1} OF ${C.dailyLength}` : `LEVEL ${String(level.number).padStart(2,'0')} COMPLETE`;
+  $('overlay-kicker').textContent = mode === 'daily' ? `DAILY TRAIL · ${dailyStage+1} OF ${C.dailyLength}` : mode === 'weekly' ? 'WEEKLY PUZZLE COMPLETE' : `LEVEL ${String(level.number).padStart(2,'0')} COMPLETE`;
   $('reward-stars').replaceChildren(...Array.from({length:3},(_,i)=>icon('star',i<(result?.stars||3)?'earned':'')));
   $('reward-stars').setAttribute('role','img'); $('reward-stars').setAttribute('aria-label',`${result?.stars||3} of 3 stars`);
-  $('overlay-title').textContent = result?.lakeReward ? 'A whole lake alight.' : result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
-  $('result-stats').replaceChildren(...[[stones.length,'Stones used'],[attempts,'Drops'],[`${result?.stars || 3} / 3`,'Level stars']].map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
-  const detail = mode==='daily' ? dailyStage===0 ? `Daily ripple complete${result?.coinsGained?` · +${result.coinsGained} coin`:''}\nOptional trail: two harder puzzles` : dailyStage===C.dailyLength-1 ? `Trail complete${result?.coinsGained?` · +${result.coinsGained} coins`:''}` : 'Trail puzzle complete' : result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
+  $('overlay-title').textContent = mode==='weekly' ? result?.newRecord ? 'A new weekly best.' : 'A quiet victory.' : result?.lakeReward ? 'A whole lake alight.' : result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
+  $('result-stats').replaceChildren(...(mode==='weekly' ? [[`${result?.stars || 3} / 3`,'Stars'],[weeklyTime(weeklySeconds),'Time'],[attempts,'Drops']] : [[stones.length,'Stones used'],[attempts,'Drops'],[`${result?.stars || 3} / 3`,'Level stars']]).map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
+  const detail = mode==='weekly' ? `${result?.newRecord?'Personal best saved':'Your best still stands'}${result?.coinsGained?` · +${result.coinsGained} ${result.coinsGained===1?'coin':'coins'}`:''}\nStars rank first. Faster time breaks ties.` : mode==='daily' ? dailyStage===0 ? `Daily ripple complete${result?.coinsGained?` · +${result.coinsGained} coin`:''}\nOptional trail: two harder puzzles` : dailyStage===C.dailyLength-1 ? `Trail complete${result?.coinsGained?` · +${result.coinsGained} coins`:''}` : 'Trail puzzle complete' : result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
   const dailyDone = mode === 'daily' && dailyStage === C.dailyLength - 1;
   $('overlay-text').textContent = `${detail}${dailyDone ? `\n${progress.streak} day trail streak` : mode === 'campaign' && level.number === 3 ? '\nDaily puzzle unlocked. One quick puzzle each day.' : ''}`;
-  action('next',mode === 'daily' ? 'Back to your journey' : 'Next level','arrow-right');
+  action('next',mode === 'daily' || mode === 'weekly' ? 'Back to your journey' : 'Next level','arrow-right');
   $('daily-continue').hidden = mode!=='daily' || dailyDone || daySeed()!==dailyDay;
   if (!$('daily-continue').hidden) action('daily-continue',`Continue trail · ${dailyStage+2}/${C.dailyLength}`,'arrow-right');
   $('copy').hidden = !dailyDone; $('copy').textContent = 'Copy daily result';
@@ -420,10 +426,11 @@ function overlay() {
   if(!$('overlay').hidden && $('overlay').contains(document.activeElement) && !document.activeElement.getClientRects().length) $('next').focus({preventScroll:true});
 
 }
-function rewardKey() { return mode === 'daily' ? `d${dailyDay}-${dailyStage}` : `l${level.number}`; }
+function rewardKey() { return mode === 'daily' ? `d${dailyDay}-${dailyStage}` : mode === 'weekly' ? `w${weeklyWeek}` : `l${level.number}`; }
 function drop() {
   if (phase !== 'ready' || paused() || !stones.length) return;
-  touched = true; attempts++; drops++; phase = 'running'; wave.reset(stones); lit.fill(false); sound.unlock(); sound.splash(progress.cosmetics.stone);
+  if (mode === 'weekly' && weeklyId() !== weeklyWeek) { level = null; enter('weekly').then(()=>showRewardToast('New weekly lake','A fresh puzzle is ready',false)); return; }
+  attempts++; drops++; phase = 'running'; wave.reset(stones); lit.fill(false); sound.unlock(); sound.splash(progress.cosmetics.stone);
   renderer.failure=null;setInstruction('Watch your ripples meet.'); $('hint-finger').classList.remove('visible'); refresh(); save();
 }
 function win() {
@@ -433,9 +440,18 @@ function finishWin() {
   phase = 'complete'; renderer.zoom = 0;
   finishTutorial();
   const coinsBefore=progress.tokens;
-  result = complete(progress, rewardKey(), stones.length, level.par, resetUsed, { attempts, elapsed });
-  if (mode === 'campaign') { progress.level = Math.max(progress.level, level.number + 1); portal.milestone(progress.level - 1); }
-  else { finishDaily(progress, dailyDay, dailyStage, result, stones.length);result.discoveries=readyDiscoveries(progress); }
+  if (mode === 'weekly') {
+    const stars=weeklyStars(stones.length,level.par), best=recordWeekly(progress,weeklyWeek,stars,weeklySeconds);
+    const reward=Math.max(progress.weeklyRewards[weeklyWeek] || 0,stars===3 ? 3 : 1);
+    progress.tokens=Math.min(C.maxTokens,progress.tokens+reward-(progress.weeklyRewards[weeklyWeek]||0));
+    progress.weeklyRewards[weeklyWeek]=reward;
+    result={stars,newRecord:best.improved,better:stones.length<level.par,discoveries:readyDiscoveries(progress)};
+    if(best.improved && weeklyId()===weeklyWeek) portal.submitWeeklyScore(best.score).then(sent=>{if(sent) showRewardToast('Score sent','Check the CrazyGames weekly board',false);});
+  } else {
+    result = complete(progress, rewardKey(), stones.length, level.par, resetUsed, { attempts, elapsed });
+    if (mode === 'campaign') { progress.level = Math.max(progress.level, level.number + 1); portal.milestone(progress.level - 1); }
+    else { finishDaily(progress, dailyDay, dailyStage, result, stones.length);result.discoveries=readyDiscoveries(progress); }
+  }
   result.coinsGained=progress.tokens-coinsBefore;
   portal.happy(); syncPause(); refresh(); overlay(); save();
   // Full Launch only: an occasional chapter finish, never a daily or replay.
@@ -474,9 +490,10 @@ function tick(dt) {
 }
 let lastRender = -Infinity, renderSamples = 0, renderCost = 0, slowRenders = 0, waterQualityStep = 0, fastBatches = 0;
 function frame(now) {
-  const dt = Math.min(C.maxFrameDelta, (now - last) / 1000); last = now;
+  const rawDt = Math.max(0,(now-last)/1000), dt = Math.min(C.maxFrameDelta,rawDt); last = now;
   sound.update(phase);
   const resting=paused();
+  if (level && !resting && mode==='weekly' && (phase==='ready'||phase==='running')) weeklySeconds += rawDt;
   if (level && !resting) { accumulator += dt; while (accumulator >= 1 / C.tickHz) { tick(1 / C.tickHz); accumulator -= 1 / C.tickHz; } }
   const renderInterval = resting ? 1000 / 3 : phase === 'complete' ? 1000 / 30 : 1000 / 72;
   if (wave && level && now - lastRender >= renderInterval - 1) {
@@ -521,7 +538,7 @@ function point(e) { return renderer.point(e.clientX, e.clientY); }
 function edited(record=true) {
   if(record&&JSON.stringify(lastPlacement)!==JSON.stringify(stones)){undoStack.push(lastPlacement);if(undoStack.length>30)undoStack.shift();}
   lastPlacement=stones.map(s=>({...s}));
-  wave.reset(); lit.fill(false); renderer.failure=null;setInstruction(defaultInstruction()); touched = true; sound.place(); refresh(); save();
+  wave.reset(); lit.fill(false); renderer.failure=null;setInstruction(defaultInstruction()); sound.place(); refresh(); save();
 }
 function undoEdit(){if(!undoStack.length||phase!=='ready'||paused())return;cancelPointer();stones=undoStack.pop().map(s=>({...s}));edited(false);setInstruction('Last edit undone. Keep exploring.');}
 function cancelPointer() {
@@ -534,7 +551,7 @@ function cancelPointer() {
 }
 canvas.addEventListener('pointerdown', e => {
   if (pointer || !level || phase !== 'ready' || paused() || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  e.preventDefault(); sound.unlock(); touched = true; const p = point(e), v = renderer.view, hitRadius = e.pointerType === 'touch' ? C.touchPixels / 2 : Math.max(C.mouseHitPixels, C.touchRadius * v.size / C.size);
+  e.preventDefault(); sound.unlock(); const p = point(e), v = renderer.view, hitRadius = e.pointerType === 'touch' ? C.touchPixels / 2 : Math.max(C.mouseHitPixels, C.touchRadius * v.size / C.size);
   let index = -1, nearest = hitRadius ** 2; stones.forEach((s,i) => { const d = ((p.x - s.x) * v.width / C.size) ** 2 + ((p.y - s.y) * v.height / C.size) ** 2; if (d <= nearest) { index = i; nearest = d; } });
   pointer = { id: e.pointerId, start: p, startScreen:{x:e.clientX,y:e.clientY}, lastScreen:{x:e.clientX,y:e.clientY}, offset:index >= 0 ? {x:stones[index].x-p.x,y:stones[index].y-p.y} : {x:0,y:0}, index, original: index >= 0 ? {...stones[index]} : null, moved: false };
   canvas.classList.toggle('is-moving',index >= 0);
@@ -600,7 +617,7 @@ $('next').onclick = async () => {
   if (adPaused || loading) return;
   if (manualPause) { manualPause = false; syncPause(); refresh(); overlay(); return; }
   if (phase !== 'complete') return;
-  if (mode === 'daily') {
+  if (mode === 'daily' || mode === 'weekly') {
     if (progress.campaign?.completed) progress.campaign={number:progress.level};
     await enter('campaign'); return;
   }
@@ -646,6 +663,14 @@ $('journal-settings').onclick = () => openSettings(true);
 for (const id of ['settings-dismiss','settings-close']) $(id).onclick = () => $('settings-dialog').close();
 $('settings-dialog').addEventListener('close', () => { syncPause(); refresh(); if (settingsReturnToJournal) { settingsReturnToJournal = false; openCollection(); } });
 $('settings-howto').onclick = () => { const returnToJournal = settingsReturnToJournal; settingsReturnToJournal = false; $('settings-dialog').close(); openControls(returnToJournal); };
+$('new-player').onclick = () => { settingsReturnToJournal = false; $('settings-dialog').close(); $('new-player-dialog').showModal(); revealPanel($('new-player-dialog')); syncPause(); };
+for(const id of ['new-player-cancel','new-player-dismiss']) $(id).onclick = () => $('new-player-dialog').close();
+$('new-player-dialog').addEventListener('close',()=>{syncPause();refresh();});
+$('new-player-confirm').onclick = async () => {
+  $('new-player-dialog').close();
+  progress = freshProgress(); mode = 'campaign'; level = null; tutorialActive = false; manualPause = false;
+  await enter('campaign');
+};
 $('setting-sound').onchange = event => { if (portal.muteAudio) return; sound.muted = !event.target.checked; progress.muted = sound.muted; sound.unlock(); sound.sync(); save(); refresh(); };
 $('setting-ambience').onchange = event => { progress.preferences.ambientSound = event.target.checked; sound.ambientEnabled = event.target.checked; sound.sync(); save(); refresh(); };
 $('setting-music').onchange = event => { progress.preferences.musicEnabled = event.target.checked; sound.musicEnabled = event.target.checked; sound.sync(); save(); refresh(); };
@@ -660,7 +685,7 @@ $('reroll').onclick = () => reward(reroll);
 $('reroll-token').onclick = () => { if (!progress.goals.rerolled && spend(progress,1)) reroll(); };
 $('replay').onclick = async () => {
   if (phase !== 'complete' || adPaused) return;
-  progress[mode] = { number:level.number, day:dailyDay, stage:dailyStage }; level = null; await enter();
+  progress[mode] = { number:level.number, day:dailyDay, week:weeklyWeek, stage:dailyStage }; level = null; await enter();
 };
 $('daily-continue').onclick = async () => {
   if (mode!=='daily'||phase!=='complete'||dailyStage>=C.dailyLength-1||daySeed()!==dailyDay||loading||adPaused)return;
@@ -749,6 +774,7 @@ for (const [index,tab] of journalTabs.entries()) {
   };
 }
 $('journal-daily').onclick = async () => { if (loading || adPaused || (mode!=='daily'&&progress.level<=C.dailyUnlock)) return; $('collection-dialog').close(); manualPause = false; if(mode!=='daily'&&progress.dailyResults[daySeed()]?.trail){save();progress.daily={day:daySeed(),stage:0};level=null;} await enter(mode==='daily'?'campaign':'daily'); };
+$('journal-weekly').onclick = async () => { if (loading || adPaused || (mode!=='weekly'&&progress.level<=C.weeklyUnlock)) return; $('collection-dialog').close(); manualPause = false; await enter(mode==='weekly'?'campaign':'weekly'); };
 $('claim-daily').onclick = () => { const gift=claimDailyGift(progress);if(!gift)return;save();refresh();renderDiscoveries();showRewardToast(`Day ${gift.streak} reward`,`+${gift.reward} coins`); };
 for(const button of $('theme-options').querySelectorAll('button'))button.onclick=()=>{if(setLakeLight(progress,activeLakeNumber(),button.dataset.light)){applyTheme();save();showRewardToast(button.dataset.light==='day'?'Daylight selected':'Nightfall selected',lakeForLevel(activeLakeNumber()).name);} };
 $('journal-back').onclick = () => $('collection-dialog').close();
@@ -787,26 +813,22 @@ document.addEventListener('keydown', e => {
   keyboardHover();
 });
 
-requestAnimationFrame(frame); await enter();
-portal.init().then(async () => {
-  if (portal.sdk?.data) {
-    const cloud = portal.initialData;
-    if (cloud && !touched) { progress = parseProgress(cloud); mode = progress.mode; level = null; await enter(); }
-    else if (cloud) {
-      const remote = parseProgress(cloud);
-      for (const [key,value] of Object.entries(remote.stars)) progress.stars[key] = Math.max(progress.stars[key] || 0, value);
-      progress.level = Math.max(progress.level,remote.level); progress.bonus = Math.max(progress.bonus,remote.bonus);
-      for(const key of ['doubled','dailyResults','chapters','mastery','lakeRewards','discoveries','records'])progress[key]={...remote[key],...progress[key]};
-      progress.lakeLights={...remote.lakeLights,...progress.lakeLights};
-      for(const kind of ['stones','lanterns'])progress.cosmetics[kind]=[...new Set([...remote.cosmetics[kind],...progress.cosmetics[kind]])];
-      progress.tokens=Math.max(progress.tokens,remote.tokens);
-      if(remote.dailyGift.lastDay>progress.dailyGift.lastDay)progress.dailyGift=remote.dailyGift;
-      if (remote.lastDaily > progress.lastDaily) { progress.lastDaily = remote.lastDaily; progress.streak = remote.streak; }
-      applyTheme();
-    }
-    portal.acceptData(); save();
+requestAnimationFrame(frame);
+// A CrazyGames account's data is authoritative. A new account must never inherit
+// a previous visitor's local save, even when its cloud slot is empty.
+const portalHost = window.top !== window || /(^|\.)crazygames\.com$/.test(location.hostname);
+const sdkAtStart = portalHost || !!window.CrazyGames?.SDK;
+if (sdkAtStart) await portal.init();
+if (portal.sdk?.data && (portal.initialData || portal.sdk.environment === 'crazygames')) progress = parseProgress(portal.initialData);
+else if (portalHost && !portal.sdk?.data) progress = freshProgress();
+mode = progress.mode; portal.acceptData(); await enter();
+if (!sdkAtStart) portal.init().then(async () => {
+  if (portal.sdk?.data && (portal.initialData || portal.sdk.environment === 'crazygames')) {
+    progress = parseProgress(portal.initialData); mode = progress.mode; level = null;
+    for(const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+    await enter();
   }
-  portal.context({ level:level.number, mode }); syncPause(); refresh();
+  if (level) { portal.context({level:level.number,mode}); syncPause(); refresh(); }
 });
 // Explicit test-only harness; production URL exposes no solution controls.
 if (new URLSearchParams(location.search).has('test')) window.__ripple = {

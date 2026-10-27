@@ -232,8 +232,10 @@ try {
   await shot('shop');await closeJournal();
   await page.evaluate(()=>{window.__ripple.state.progress.level=121;window.__ripple.save();});
   await openJournal();await page.click('#tab-shop');
-  assert.match(await page.locator('[data-item="void"] button').innerText(),/300 coins/);
-  assert.match(await page.locator('[data-item="aurora"] button').innerText(),/220 coins/);
+  assert.match(await page.locator('[data-item="void"] button').innerText(),/3★ on levels 1–120/);
+  assert.match(await page.locator('[data-item="void"] small').innerText(),/400 coins/);
+  assert.match(await page.locator('[data-item="aurora"] button').innerText(),/3★ on levels 1–120/);
+  assert.match(await page.locator('[data-item="aurora"] small').innerText(),/280 coins/);
   assert.equal(await page.locator('[data-item="void"] img').evaluate(image=>image.complete&&image.naturalWidth>0),true);
   assert.equal(await page.locator('[data-item="aurora"] img').evaluate(image=>image.complete&&image.naturalWidth>0),true);
   await page.locator('[data-item="void"]').scrollIntoViewIfNeeded();

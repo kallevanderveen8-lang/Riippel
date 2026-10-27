@@ -1,4 +1,5 @@
 import { C } from './config.js';
+import { encryptScore } from './weekly.js';
 const deadline = (task, ms) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error('SDK timeout')), ms);
   Promise.resolve(task).then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
@@ -49,6 +50,16 @@ export class Portal {
     try {
       if (this.sdk?.data) { if (!this.cloudRead) return false; if (!this.dataAccepted) return true; this.sdk.data.setItem(C.saveKey, value); }
       else localStorage.setItem(C.saveKey, value);
+      return true;
+    } catch { return false; }
+  }
+  leaderboardReady() { return !!(C.weeklyLeaderboard.enabled && C.weeklyLeaderboard.encryptionKey && this.sdk?.user?.submitScore); }
+  async submitWeeklyScore(score) {
+    if (!this.leaderboardReady()) return false;
+    try {
+      const encryptedScore = await encryptScore(score, C.weeklyLeaderboard.encryptionKey);
+      await this.sdk.user.submitScore({ encryptedScore, score });
+      // SDK acknowledgement means submitted, not necessarily accepted by the backend.
       return true;
     } catch { return false; }
   }

@@ -54,6 +54,7 @@
   <section id="panel-today" role="tabpanel" aria-labelledby="jump-goals" tabindex="0" hidden>
    <div class="daily-gift"><div><span class="eyebrow">DAILY REWARD</span><h3 id="daily-gift-title">A little something for today</h3><p id="daily-gift-detail">Come back tomorrow for another reward.</p></div><button id="claim-daily" class="primary">Claim reward</button></div>
    <div class="daily-teaser"><h3 id="daily-title">A trail to share</h3><p id="daily-teaser">Daily trail unlocks after level 3.</p><button id="journal-daily" class="primary">Play daily trail</button></div>
+   <div class="weekly-teaser"><div><span class="eyebrow">WEEKLY PUZZLE</span><h3>One lake for everyone.</h3><p id="weekly-teaser">Unlocks after level 5.</p><small id="weekly-leaderboard">CrazyGames ranking is not active yet.</small></div><button id="journal-weekly" class="primary">Play weekly puzzle</button></div>
    <div class="daily-goals"><h3>Today’s goals</h3><p class="section-note">Earn 2 bonus stars for each completed goal.</p><div id="goals"></div><button id="reroll-token" class="reward-choice">Use 1 coin · Easier daily goal</button><button id="reroll" class="reward-choice" hidden>Watch ad · Easier daily goal</button></div>
    <p id="token-balance"></p>
   </section>
@@ -101,8 +102,14 @@
   <section class="settings-section" aria-labelledby="settings-controls-title"><h3 class="settings-group-label" id="settings-controls-title">CONTROLS</h3><div class="settings-list">
    <label class="settings-row" for="setting-dock"><span class="settings-row-copy"><strong>Toolbar at the top</strong><small class="sr-only">Keep the lower shore clear</small></span><input id="setting-dock" type="checkbox" role="switch"></label>
   </div></section>
+  <section class="settings-section" aria-labelledby="settings-progress-title"><h3 class="settings-group-label" id="settings-progress-title">PROGRESS</h3><button id="new-player" class="reward-choice">Start a new game</button></section>
  </div>
  <div class="dialog-footer"><button id="settings-howto" class="text-button">How to play <span data-icon="arrow-right"></span></button><div class="dialog-footer-actions"><span class="journal-footer-note">Saved automatically</span><button id="settings-close" class="primary">Done</button></div></div>
+</dialog>
+<dialog id="new-player-dialog" aria-labelledby="new-player-title" aria-describedby="new-player-description">
+ <div class="dialog-header"><div><div class="eyebrow">NEW GAME</div><h2 id="new-player-title">Begin at the first lake?</h2></div><button id="new-player-dismiss" class="icon-button" aria-label="Keep current progress"><span data-icon="close"></span></button></div>
+ <div class="dialog-body"><p id="new-player-description">This replaces the saved levels, coins and collection for this player. The short guide appears again.</p></div>
+ <div class="dialog-footer"><button id="new-player-cancel" class="reward-choice">Keep playing</button><button id="new-player-confirm" class="primary">Start from level 1</button></div>
 </dialog>
 <dialog id="welcome-dialog" aria-labelledby="welcome-title" aria-describedby="welcome-description">
  <div class="welcome-scene" aria-hidden="true"></div>
