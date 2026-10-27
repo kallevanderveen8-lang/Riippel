@@ -498,6 +498,12 @@ export class Renderer {
     else if(level.rocks.length)ctx.drawImage(this.rocksLayer(level),0,0,C.size,C.size);
     for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     if (hover && !running && hover.x >= 7 && hover.x <= 121 && hover.y >= 7 && hover.y <= 121) {
+      if(hover.preview && hover.valid) {
+        const radius=Math.max(C.render.placedStoneRadius,C.render.stoneMinPixels/(2*scale));
+        ctx.save();ctx.translate(hover.x,hover.y);ctx.scale(v.size/v.width,v.size/v.height);
+        ctx.globalAlpha=.55;ctx.rotate(-.4+stones.length*1.2);
+        ctx.drawImage(this.stoneFor(stones.length),-radius,-radius,radius*2,radius*2);ctx.restore();
+      }
       ctx.strokeStyle = hover.keyboard ? '#fff4d9' : hover.valid ? '#e8e9e187' : '#e4bdac77'; ctx.lineWidth = hover.keyboard ? .45 : .17; ctx.beginPath(); ctx.ellipse(hover.x, hover.y, 3, 3, 0, 0, Math.PI * 2); ctx.stroke();
       if(hover.keyboard) { ctx.beginPath(); ctx.moveTo(hover.x-5,hover.y);ctx.lineTo(hover.x+5,hover.y);ctx.moveTo(hover.x,hover.y-5);ctx.lineTo(hover.x,hover.y+5);ctx.stroke(); }
     }

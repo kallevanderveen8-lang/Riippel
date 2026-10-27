@@ -10,7 +10,7 @@ export const C = Object.freeze({
   themeStars: 10, hintFailures: 2, rewardedFailures: 3, masteryTokens: 2, guidedHelpFailures: 6,
   firstAdSeconds: 180, adIntervalSeconds: 180, adEveryLevels: 5,
   adTimeoutMs: 90000, sdkTimeoutMs: 2500, saveKey: 'ripple-pond-v1',
-  winSeconds: 1.0, burstSeconds: 1.05, bubbleSeconds: 0.48, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], recordLimit: 300, maxTokens: 999, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
+  winSeconds: 1.0, burstSeconds: 1.05, bubbleSeconds: 0.48, visualTailSteps: 720, chapterLength: 5, lakeLength: 10, featuredLevels: 120, lakeCompletionCoins: 4, completionMilestone: 30, chapterBonus: 3, initialTokens: 3, chapterTokens: 2, dailyLength: 3, dailyLevels: [8, 12, 16], dailyOpeningVersion: 3, dailyTokens: 2, dailyGiftCoins: [2,3,3,4,4,5,7], recordLimit: 300, maxTokens: 999, firstFreeHelpFailures: 2, freeHelpFailures: 4, adRequestTimeoutMs: 15000, sdkInitTimeoutMs: 4500, touchPixels: 48, mouseHitPixels: 14, touchRadius: 5, dragThreshold: 2,
   goalReward: 2, goalSolves: 5, lakeSkipCost: 3, solverBudget: 24, benchmarkCount: 300,
   cosmetics: {
     stones: [

@@ -64,6 +64,19 @@ export function candidatesFor(wave, solution, rocks, count, rng) {
 }
 export function generate(number, seed = number * 7919, daily = false, legacy = false) {
   const start = performance.now(), rng = mulberry32(seed), d = difficulty(number, legacy);
+  // The first daily puzzle opens just after campaign level 3. Give it a short,
+  // date-seeded one-stone layout; keep the old generated level for saved runs.
+  if (daily && number === C.dailyLevels[0] && !legacy) {
+    const x = 50 + Math.floor(rng() * 29), y = 50 + Math.floor(rng() * 29);
+    const [dx,dy] = [[13,0],[0,13],[9,9],[9,-9]][Math.floor(rng() * 4)];
+    const solution = [{ x, y, delay: 0 }];
+    const lanterns = [{ x:x-dx, y:y-dy },{ x:x+dx, y:y+dy }];
+    const peak = new Wave().run(solution);
+    return { number, seed, name: 'Today’s quiet ripple', par: 1, limit: 2,
+      rocks: [], solution, lanterns, clearance: 0,
+      margins: lanterns.map(l => ({ all: peak[cell(l.x,l.y)], single: peak[cell(l.x,l.y)] })),
+      generationMs: performance.now() - start };
+  }
   if (number <= 2) return { number, seed, name: names[number - 1], par: 1, limit: 3, rocks: [], solution: [{ x: 64, y: 64, delay: 0 }], lanterns: number === 1 ? [{ x: 64, y: 49 }] : [{ x: 51, y: 64 }, { x: 77, y: 64 }], clearance: 0, generationMs: performance.now() - start };
   if (number === 3 || number === 4) {
     const solution = [{ x: 36, y: 64, delay: 0 }, { x: 92, y: 64, delay: 0 }];

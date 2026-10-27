@@ -195,8 +195,11 @@ async function enter(newMode = mode) {
   const number = mode === 'daily' ? C.dailyLevels[dailyStage] : saved?.number || progress.level;
   const restore = saved && (mode !== 'daily' || saved.day === dailyDay && saved.stage === dailyStage);
   const seed = mode === 'daily' ? (Math.imul(dailyDay, 2654435761) + dailyStage * 7919) >>> 0 : number * 7919;
-  const legacy = !!(restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) === 1 && number > SCRIPTED.length);
-  level = await fetchLevel(number, seed, mode === 'daily', legacy); level.generatorVersion = legacy ? 1 : 2; wave = new Wave(level.rocks);
+  const oldDailyOpening = !!(mode === 'daily' && dailyStage === 0 && restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) < C.dailyOpeningVersion);
+  const legacy = oldDailyOpening || !!(restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) === 1 && number > SCRIPTED.length);
+  level = await fetchLevel(number, seed, mode === 'daily', legacy);
+  level.generatorVersion = oldDailyOpening ? saved.generatorVersion || 2 : mode === 'daily' && dailyStage === 0 ? C.dailyOpeningVersion : legacy ? 1 : 2;
+  wave = new Wave(level.rocks);
   wave.peakIndices = level.lanterns.map(l => cell(l.x,l.y));
   stones = restore && Array.isArray(saved.stones) ? saved.stones.slice(0, level.limit).map(s => ({ x: Math.round(Number(s.x)), y: Math.round(Number(s.y)), delay: Math.max(0, Math.min(C.maxDelay, Math.floor(Number(s.delay) || 0))) })).filter((s,i,all) => Number.isFinite(s.x) && Number.isFinite(s.y) && canPlace(s, level, all.slice(0,i))) : [];
   lit = level.lanterns.map(() => false); attempts = restore ? Number(saved.attempts) || 0 : 0; resetUsed = restore ? !!saved.resetUsed : false;
@@ -344,18 +347,19 @@ function refresh() {
   $('sound').dataset.tooltip = $('sound').getAttribute('aria-label'); $('pause').dataset.tooltip = $('pause').getAttribute('aria-label');
   const ads = portal.eligible(), canDouble = !manualPause && phase === 'complete' && !progress.doubled[rewardKey()];
   const allHints = hintCount >= level.solution.length || (level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures);
+  const freeHint = !allHints && attempts >= C.firstFreeHelpFailures && (hintCount === 0 || attempts >= C.freeHelpFailures);
   $('hint').hidden = !(attempts >= C.hintFailures && phase === 'ready');
-  $('hint').textContent = allHints && attempts < C.guidedHelpFailures ? 'Guide rings' : attempts >= C.freeHelpFailures ? 'Free help' : 'Hint';
-  $('help-open').classList.toggle('help-ready',attempts>=C.freeHelpFailures && phase==='ready');
-  $('help-open').dataset.tooltip = attempts>=C.freeHelpFailures && phase==='ready' ? 'Help · free guidance available' : 'Help';
+  $('hint').textContent = allHints && attempts < C.guidedHelpFailures ? 'Guide rings' : freeHint ? 'Free hint' : 'Hint';
+  $('help-open').classList.toggle('help-ready',freeHint && phase==='ready');
+  $('help-open').dataset.tooltip = freeHint && phase==='ready' ? 'Help · free hint available' : 'Help';
   $('help-lake-name').textContent = level.name; $('help-tip').textContent = defaultInstruction();
   $('help-scoring').textContent = `Use ${level.par} ${level.par===1?'stone':'stones'} or fewer for three stars.`;
-  $('hint-token').disabled = progress.tokens < 1 || allHints; $('hint-token').textContent = `Use 1 coin · Reveal a stone (${progress.tokens} left)`;
-  $('hint-ad').hidden = !(ads && attempts >= C.rewardedFailures);
+  $('hint-token').hidden = freeHint; $('hint-token').disabled = progress.tokens < 1 || allHints; $('hint-token').textContent = `Use 1 coin · Reveal a stone (${progress.tokens} left)`;
+  $('hint-ad').hidden = !(ads && attempts >= C.rewardedFailures) || freeHint;
   $('hint-ad').hidden = $('hint-ad').hidden || allHints;
-  $('hint-free').hidden = attempts < C.freeHelpFailures || allHints;
+  $('hint-free').hidden = !freeHint;
   $('hint-guide').hidden = attempts < C.guidedHelpFailures;
-  $('hint-description').textContent = attempts >= C.guidedHelpFailures ? 'Try a complete guided layout, then press Drop to see how its waves work. Your progress and stars are kept.' : allHints ? 'All guide rings are visible. Place a stone in each ring and match its delay. A complete guided layout unlocks after 6 drops.' : attempts >= C.freeHelpFailures ? 'A free ring marks a solution stone. You can reveal more rings without spending coins.' : 'Reveal one solution stone, or keep experimenting. Free rings unlock after 4 drops; a guided layout after 6.';
+  $('hint-description').textContent = attempts >= C.guidedHelpFailures ? 'Try a complete guided layout, then press Drop to see how its waves work. Your progress and stars are kept.' : allHints ? 'All guide rings are visible. Place a stone in each ring and match its delay. A complete guided layout unlocks after 6 drops.' : freeHint ? attempts < C.freeHelpFailures ? 'Your first guide ring is free. Place a stone in it, then try another drop.' : 'A free ring marks a solution stone. You can reveal more rings without spending coins.' : 'Reveal another stone for 1 coin, or keep experimenting. More free rings unlock after 4 drops.';
   $('double').hidden = !(ads && canDouble); $('double-token').hidden = !canDouble; $('double-token').disabled = progress.tokens < 2;
   if (canDouble) {
     $('double-token').textContent = `Use 2 coins · +${result.stars} bonus stars`;
@@ -396,7 +400,7 @@ function overlay() {
   $('reward-stars').setAttribute('role','img'); $('reward-stars').setAttribute('aria-label',`${result?.stars||3} of 3 stars`);
   $('overlay-title').textContent = result?.lakeReward ? 'A whole lake alight.' : result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
   $('result-stats').replaceChildren(...[[stones.length,'Stones used'],[attempts,'Drops'],[`${result?.stars || 3} / 3`,'Level stars']].map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
-  const detail = mode==='daily' ? dailyStage===0 ? `Daily ripple complete${result?.coinsGained?` · +${result.coinsGained} coin`:''}` : dailyStage===C.dailyLength-1 ? `Trail complete${result?.coinsGained?` · +${result.coinsGained} coins`:''}` : 'Trail puzzle complete' : result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
+  const detail = mode==='daily' ? dailyStage===0 ? `Daily ripple complete${result?.coinsGained?` · +${result.coinsGained} coin`:''}\nOptional trail: two harder puzzles` : dailyStage===C.dailyLength-1 ? `Trail complete${result?.coinsGained?` · +${result.coinsGained} coins`:''}` : 'Trail puzzle complete' : result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
   const dailyDone = mode === 'daily' && dailyStage === C.dailyLength - 1;
   $('overlay-text').textContent = `${detail}${dailyDone ? `\n${progress.streak} day trail streak` : mode === 'campaign' && level.number === 3 ? '\nDaily puzzle unlocked. One quick puzzle each day.' : ''}`;
   action('next',mode === 'daily' ? 'Back to your journey' : 'Next level','arrow-right');
@@ -454,7 +458,8 @@ function tick(dt) {
         const weak = level.lanterns.map((l,i)=>({i,ratio:wave.peak[cell(l.x,l.y)]/C.threshold})).filter(p=>!lit[p.i]).sort((a,b)=>b.ratio-a.ratio)[0];
         renderer.failure=weak?.i ?? null;
         sound.fail();
-        setInstruction(attempts >= C.freeHelpFailures ? `${lit.filter(Boolean).length}/${lit.length} lit. Free guidance is available in Help.` : hint ? 'Two waves meeting make a bigger wave. Try the faint rings.' : weak?.ratio>=.7 ? `${lit.filter(Boolean).length}/${lit.length} lit. The marked lantern is close; shift a stone slightly.` : `${lit.filter(Boolean).length}/${lit.length} lit. Bring two ripples together by the marked lantern.`,true,true);
+        const freeHelp = attempts >= C.freeHelpFailures || attempts >= C.firstFreeHelpFailures && hintCount === 0;
+        setInstruction(hint ? 'Two waves meeting make a bigger wave. Try the faint rings.' : freeHelp ? `${lit.filter(Boolean).length}/${lit.length} lit. A free hint is available in Help.` : weak?.ratio>=.7 ? `${lit.filter(Boolean).length}/${lit.length} lit. The marked lantern is close; shift a stone slightly.` : `${lit.filter(Boolean).length}/${lit.length} lit. Bring two ripples together by the marked lantern.`,true,true);
         refresh(); save(); break;
       }
     }
@@ -540,7 +545,8 @@ canvas.addEventListener('pointermove', e => {
   const v = renderer.view;
   const onStone = stones.some(s => ((p.x-s.x)*v.width/C.size)**2 + ((p.y-s.y)*v.height/C.size)**2 <= Math.max(C.mouseHitPixels,C.touchRadius*v.size/C.size)**2);
   canvas.classList.toggle('is-stone',onStone && !pointer);
-  hover = onStone ? null : { ...p, valid: canPlace(p,level,stones,pointer?.index ?? -1) };
+  const canAdd = stones.length < level.limit || (pointer?.index ?? -1) >= 0;
+  hover = onStone ? null : { ...p, valid: canAdd && canPlace(p,level,stones,pointer?.index ?? -1), preview: !pointer && canAdd };
   if (!pointer || pointer.id !== e.pointerId) return;
   if (distance2({x:e.clientX,y:e.clientY}, pointer.startScreen) > 6 ** 2) pointer.moved = true;
   if (pointer.moved && pointer.index < 0 && e.pointerType === 'mouse') {
@@ -645,7 +651,7 @@ $('setting-ambience').onchange = event => { progress.preferences.ambientSound = 
 $('setting-music').onchange = event => { progress.preferences.musicEnabled = event.target.checked; sound.musicEnabled = event.target.checked; sound.sync(); save(); refresh(); };
 for (const [id,key] of [['setting-motion','reducedMotion'],['setting-contrast','highContrast'],['setting-dock','dockTop']]) $(id).onchange = event => { progress.preferences[key] = event.target.checked; applyPreferences(); save(); refresh(); };
 $('hint-token').onclick = () => { if (spend(progress,1)) { reveal(); $('hint-dialog').close(); save(); refresh(); } };
-$('hint-free').onclick = () => { if (attempts >= C.freeHelpFailures) { reveal(); $('hint-dialog').close(); save(); refresh(); } };
+$('hint-free').onclick = () => { if (attempts >= C.firstFreeHelpFailures && (hintCount === 0 || attempts >= C.freeHelpFailures) && hintCount < level.solution.length) { reveal(); $('hint-dialog').close(); save(); refresh(); } };
 $('hint-guide').onclick = () => { if (attempts < C.guidedHelpFailures || phase !== 'ready') return; stones = level.solution.map(s=>({...s})); hintCount = level.solution.length; $('hint-dialog').close(); edited(); setInstruction('Guided layout ready. Press Drop and watch the waves meet.'); };
 $('hint-ad').onclick = () => reward(reveal);
 $('double').onclick = () => { if (!progress.doubled[rewardKey()] && phase === 'complete') reward(doubleStars); };
@@ -749,9 +755,9 @@ $('journal-back').onclick = () => $('collection-dialog').close();
 $('close-dialog').onclick = () => $('collection-dialog').close(); $('collection-dialog').addEventListener('close', () => { syncPause(); refresh(); });
 document.addEventListener('visibilitychange', () => { hidden = document.hidden; syncPause(true); save(); }); window.addEventListener('pagehide',save);
 function keyboardHover() {
-  hover = {...keyboardPoint,valid:canPlace(keyboardPoint,level,stones),keyboard:true};
   const index = stones.findIndex(s=>distance2(s,keyboardPoint)<C.touchRadius**2);
-  $('keyboard-status').textContent = `Position ${keyboardPoint.x}, ${keyboardPoint.y}. ${index>=0 ? `Stone ${index+1}, delay ${stones[index].delay||0} seconds. ${level.number>=C.delayUnlock?'Enter to change delay. ':''}Delete to remove.` : hover.valid ? 'Open water. Enter to place.' : 'Protected water. Choose another spot.'}`;
+  hover = {...keyboardPoint,valid:index>=0 || stones.length<level.limit&&canPlace(keyboardPoint,level,stones),keyboard:true};
+  $('keyboard-status').textContent = `Position ${keyboardPoint.x}, ${keyboardPoint.y}. ${index>=0 ? `Stone ${index+1}, delay ${stones[index].delay||0} seconds. ${level.number>=C.delayUnlock?'Enter to change delay. ':''}Delete to remove.` : stones.length>=level.limit ? 'All stones placed. Use Delete to free a place.' : hover.valid ? 'Open water. Enter to place.' : 'Protected water. Choose another spot.'}`;
 }
 canvas.addEventListener('focus',()=>{ if(level && phase==='ready') keyboardHover(); });
 canvas.addEventListener('blur',()=>{ if(hover?.keyboard) hover=null; });

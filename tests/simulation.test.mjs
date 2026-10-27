@@ -8,6 +8,20 @@ test('delayed impulses enter only on their integer simulation step',()=>{const w
 test('all 10 authored onboarding solutions are valid and robust',()=>{for(const l of SCRIPTED){const w=new Wave(l.rocks),p=w.run(l.solution);for(const lamp of l.lanterns)assert.ok(p[cell(lamp.x,lamp.y)]>=C.threshold,`pond ${l.number}`);for(let i=0;i<l.solution.length;i++)assert.ok(canPlace(l.solution[i],l,l.solution,i));if(l.number>=3){assert.equal(l.margins.length,l.lanterns.length);for(const m of l.margins){assert.ok(m.all>=1.15*C.threshold);assert.ok(m.single<=.7*C.threshold);}}}});
 test('fixed second and third lake puzzles retain certified solutions',()=>{assert.equal(CURATED.length,20);for(const l of CURATED){const peak=new Wave(l.rocks).run(l.solution);assert.equal(l.seed,l.number*7919);assert.equal(l.par,difficulty(l.number).par);for(const lamp of l.lanterns)assert.ok(peak[cell(lamp.x,lamp.y)]>=C.threshold,`level ${l.number}`);for(let i=0;i<l.solution.length;i++)assert.ok(canPlace(l.solution[i],l,l.solution,i));}});
 test('generated level and UTC date seed are deterministic',()=>{const a=generate(21,12345),b=generate(21,12345);delete a.generationMs;delete b.generationMs;assert.deepEqual(a,b);assert.equal(daySeed(new Date('2026-10-21T01:00:00+02:00')),daySeed(new Date('2026-10-20T23:00:00Z')));const r=mulberry32(3),s=mulberry32(3);assert.deepEqual(Array.from({length:50},r),Array.from({length:50},s));});
+test('quick daily opening changes with the day, stays one-stone solvable, and preserves old runs',()=>{
+ const seen=new Set(),start=daySeed(new Date('2026-10-27T12:00:00Z'));
+ for(let day=start;day<start+20;day++){
+  const seed=Math.imul(day,2654435761)>>>0,opening=generate(C.dailyLevels[0],seed,true);
+  assert.equal(opening.par,1);assert.equal(opening.rocks.length,0);assert.equal(opening.lanterns.length,2);
+  assert.ok(canPlace(opening.solution[0],opening));
+  const peaks=new Wave(opening.rocks).run(opening.solution);
+  for(const lantern of opening.lanterns)assert.ok(peaks[cell(lantern.x,lantern.y)]>=C.threshold,`day ${day}`);
+  seen.add(JSON.stringify(opening.lanterns));
+ }
+ assert.equal(seen.size,20);
+ const old=generate(C.dailyLevels[0],Math.imul(start,2654435761)>>>0,true,true);
+ assert.equal(old.par,3);assert.equal(old.rocks.length,1);
+});
 test('later shores vary their opening and finale while old puzzles remain reproducible',()=>{
  assert.deepEqual([11,12,13,16,20,21,30,31,40].map(n=>difficulty(n).par),[3,3,4,4,5,3,5,3,5]);
  assert.equal(difficulty(11).rocks,0);assert.equal(difficulty(12).rocks,1);assert.equal(difficulty(13).rocks,1);assert.equal(difficulty(14).rocks,2);assert.equal(difficulty(20).delays,true);
