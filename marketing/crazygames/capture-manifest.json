@@ -1,0 +1,181 @@
+{
+  "capturedAt": "2026-10-27T15:42:18.146Z",
+  "fps": 30,
+  "durationSeconds": 20,
+  "source": "Unmodified production Renderer, Wave and certified campaign layouts; editorial camera without HUD",
+  "videos": [
+    {
+      "file": "ripple-preview-landscape-1920x1080.mp4",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 18664527,
+      "puzzles": [
+        {
+          "number": 3,
+          "par": 2,
+          "stones": 2,
+          "lit": [
+            true
+          ],
+          "dropAt": 1.6,
+          "win": 2.0583333333333336,
+          "events": [
+            {
+              "type": "chime",
+              "time": 2.0583333333333336,
+              "index": 0
+            }
+          ]
+        },
+        {
+          "number": 41,
+          "par": 3,
+          "stones": 3,
+          "lit": [
+            true,
+            true,
+            true
+          ],
+          "dropAt": 8.5,
+          "win": 10.691666666666666,
+          "events": [
+            {
+              "type": "chime",
+              "time": 8.966666666666667,
+              "index": 0
+            },
+            {
+              "type": "chime",
+              "time": 9.058333333333334,
+              "index": 1
+            },
+            {
+              "type": "chime",
+              "time": 10.691666666666666,
+              "index": 2
+            }
+          ]
+        },
+        {
+          "number": 31,
+          "par": 3,
+          "stones": 3,
+          "lit": [
+            true,
+            true,
+            true
+          ],
+          "dropAt": 15.1,
+          "win": 16.03333333333333,
+          "events": [
+            {
+              "type": "chime",
+              "time": 15.625,
+              "index": 2
+            },
+            {
+              "type": "chime",
+              "time": 15.641666666666666,
+              "index": 0
+            },
+            {
+              "type": "chime",
+              "time": 16.03333333333333,
+              "index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "ripple-preview-portrait-1080x1620.mp4",
+      "width": 1080,
+      "height": 1620,
+      "bytes": 16058531,
+      "puzzles": [
+        {
+          "number": 3,
+          "par": 2,
+          "stones": 2,
+          "lit": [
+            true
+          ],
+          "dropAt": 1.6,
+          "win": 2.0583333333333336,
+          "events": [
+            {
+              "type": "chime",
+              "time": 2.0583333333333336,
+              "index": 0
+            }
+          ]
+        },
+        {
+          "number": 41,
+          "par": 3,
+          "stones": 3,
+          "lit": [
+            true,
+            true,
+            true
+          ],
+          "dropAt": 8.5,
+          "win": 10.691666666666666,
+          "events": [
+            {
+              "type": "chime",
+              "time": 8.966666666666667,
+              "index": 0
+            },
+            {
+              "type": "chime",
+              "time": 9.058333333333334,
+              "index": 1
+            },
+            {
+              "type": "chime",
+              "time": 10.691666666666666,
+              "index": 2
+            }
+          ]
+        },
+        {
+          "number": 31,
+          "par": 3,
+          "stones": 3,
+          "lit": [
+            true,
+            true,
+            true
+          ],
+          "dropAt": 15.1,
+          "win": 16.03333333333333,
+          "events": [
+            {
+              "type": "chime",
+              "time": 15.625,
+              "index": 2
+            },
+            {
+              "type": "chime",
+              "time": 15.641666666666666,
+              "index": 0
+            },
+            {
+              "type": "chime",
+              "time": 16.03333333333333,
+              "index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "ripple-preview-portrait-720x1080.mp4",
+      "width": 720,
+      "height": 1080,
+      "bytes": 8306842,
+      "derivedFrom": "ripple-preview-portrait-1080x1620.mp4"
+    }
+  ]
+}

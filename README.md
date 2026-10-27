@@ -38,6 +38,8 @@ To test exactly the production files: `node tools/serve.mjs dist`.
 
 In the CrazyGames submission, enable **Progress Save / Data Module**. Test the upload in the portal preview with SDK Inspector, an ad blocker, and normal/rewarded ad scenarios before submitting for review. The repository does not submit or publish the game to CrazyGames automatically.
 
+The [CrazyGames media pack](marketing/crazygames/README.md) supplies three required covers, landscape and portrait silent 20-second gameplay previews, faster 15-second promotional trailers with original music, five actual-game screenshots and English store copy. Open `marketing/crazygames/index.html` for the visual gallery. The source cover masters and reproducible capture/validation tools are included separately from the playable build.
+
 ## How to play
 
 1. Click open water to place a stone. All stones fall together when you press **Drop stones**.

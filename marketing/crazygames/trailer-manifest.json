@@ -1,0 +1,35 @@
+{
+  "durationSeconds": 15,
+  "fps": 30,
+  "music": "../audio/ripple-original-score.wav",
+  "tempoBPM": 96,
+  "edit": "Three five-second action clips, straight cuts on two-bar music boundaries. Gameplay is not sped up.",
+  "sourceRanges": [
+    [
+      0.9,
+      5.9
+    ],
+    [
+      7,
+      12
+    ],
+    [
+      13.65,
+      18.65
+    ]
+  ],
+  "videos": [
+    {
+      "file": "ripple-trailer-music-landscape-1920x1080.mp4",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 11996588
+    },
+    {
+      "file": "ripple-trailer-music-portrait-720x1080.mp4",
+      "width": 720,
+      "height": 1080,
+      "bytes": 5330774
+    }
+  ]
+}

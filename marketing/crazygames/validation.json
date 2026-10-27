@@ -1,0 +1,109 @@
+{
+  "checkedAt": "2026-10-27T16:02:25.329Z",
+  "reference": "https://docs.crazygames.com/requirements/game-covers/",
+  "covers": [
+    {
+      "file": "covers/ripple-landscape-1920x1080.jpg",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 841820
+    },
+    {
+      "file": "covers/ripple-portrait-800x1200.jpg",
+      "width": 800,
+      "height": 1200,
+      "bytes": 635336
+    },
+    {
+      "file": "covers/ripple-square-800x800.jpg",
+      "width": 800,
+      "height": 800,
+      "bytes": 495718
+    }
+  ],
+  "videos": [
+    {
+      "file": "videos/ripple-preview-landscape-1920x1080.mp4",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "frames": 600,
+      "seconds": 20,
+      "audioStreams": 0,
+      "bytes": 18664527,
+      "openingCoverPSNR": 43.032723,
+      "blackSegments": 0
+    },
+    {
+      "file": "videos/ripple-preview-portrait-1080x1620.mp4",
+      "width": 1080,
+      "height": 1620,
+      "fps": 30,
+      "frames": 600,
+      "seconds": 20,
+      "audioStreams": 0,
+      "bytes": 16058531,
+      "openingCoverPSNR": 35.638017,
+      "blackSegments": 0
+    },
+    {
+      "file": "videos/ripple-preview-portrait-720x1080.mp4",
+      "width": 720,
+      "height": 1080,
+      "fps": 30,
+      "frames": 600,
+      "seconds": 20,
+      "audioStreams": 0,
+      "bytes": 8306842,
+      "openingCoverPSNR": 35.654053,
+      "blackSegments": 0
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "screenshots/01-ripples-meet-1920x1080.jpg",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "file": "screenshots/02-stone-and-echo-1920x1080.jpg",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "file": "screenshots/03-moonlit-water-1920x1080.jpg",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "file": "screenshots/04-autumn-lake-1920x1080.jpg",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "file": "screenshots/05-levels-1920x1080.jpg",
+      "width": 1920,
+      "height": 1080
+    }
+  ],
+  "musicalTrailers": [
+    {
+      "file": "videos/ripple-trailer-music-landscape-1920x1080.mp4",
+      "width": 1920,
+      "height": 1080,
+      "seconds": 15,
+      "frames": 450,
+      "audio": "AAC stereo",
+      "bytes": 11996588
+    },
+    {
+      "file": "videos/ripple-trailer-music-portrait-720x1080.mp4",
+      "width": 720,
+      "height": 1080,
+      "seconds": 15,
+      "frames": 450,
+      "audio": "AAC stereo",
+      "bytes": 5330774
+    }
+  ]
+}

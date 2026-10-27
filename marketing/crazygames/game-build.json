@@ -1,0 +1,10 @@
+{
+  "file": "releases/ripple-crazygames.zip",
+  "sourceGameCommit": "07b88ca871f8e0a0cbda3d8d2b292543de045e31",
+  "bytes": 6727932,
+  "uncompressedBytes": 6918324,
+  "sha256": "44f2db906c473b88d2e8d889016fd445bbb3c3295e24adf948a8d5ee832c240d",
+  "rootIndex": true,
+  "debugHarnessRemoved": true,
+  "launchStage": "basic"
+}
