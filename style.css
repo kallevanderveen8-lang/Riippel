@@ -20,6 +20,8 @@ button:hover:not(:disabled){border-color:var(--selection)}
 #app{position:relative;width:100%;height:100dvh;overflow:hidden}
 #pond-wrap{position:absolute;inset:0}
 #pond{display:block;width:100%;height:100%;background-size:100% 100%;background-repeat:no-repeat;background-position:center;touch-action:none;cursor:crosshair}
+#pond.is-stone{cursor:grab}
+#pond.is-moving{cursor:grabbing}
 #pond:focus-visible{outline-offset:-5px;outline-color:#d6be8b}
 #pond.is-panning{cursor:grabbing}
 header{position:absolute;inset:0 0 auto;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:24px;padding:calc(var(--edge) + var(--safe-top)) max(var(--edge),var(--safe-right)) 12px max(var(--edge),var(--safe-left));z-index:2;pointer-events:none;color:var(--hud-text)}

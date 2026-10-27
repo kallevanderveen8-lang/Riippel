@@ -22,7 +22,14 @@ try {
   await guide.click('#welcome-start');assert.equal(await guide.locator('#tutorial-tip').isVisible(),true);
   const target = await guide.evaluate(()=>{const s=window.__ripple.state.level.solution[0],v=window.__ripple.state.view;return {x:v.x+v.width*s.x/128,y:v.y+v.height*s.y/128};});
   await guide.mouse.click(target.x,target.y);assert.match(await guide.locator('#tutorial-step').innerText(),/STEP 2/);
+  assert.match(await guide.locator('#drop').innerText(),/^Drop stone$/);
+  await guide.mouse.click(target.x,target.y);
+  assert.equal(await guide.evaluate(()=>window.__ripple.state.stones.length),1);
+  assert.match(await guide.locator('#feedback').innerText(),/Right-click to remove/);
   await guide.click('#drop');await guide.waitForFunction(()=>window.__ripple.state.phase==='complete');
+  assert.match(await guide.locator('#result-stats').innerText(),/3 \/ 3\s+Level stars/);
+  assert.match(await guide.locator('#result-discovery').innerText(),/\+4 bonus stars/);
+  assert.match(await guide.locator('#double-token').textContent(),/\+3 bonus stars/);
   assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.tutorialDone),true);
   await guide.reload();await guide.waitForFunction(()=>window.__ripple?.state.level?.number===1);
   assert.equal(await guide.locator('#welcome-dialog').isVisible(),false);
@@ -49,6 +56,8 @@ try {
   await guide.click('#controls-close');await guide.waitForSelector('#collection-dialog[open]');
   const coins=await guide.evaluate(()=>window.__ripple.state.progress.tokens);
   await guide.click('#lake-list button:nth-child(3)');await guide.waitForFunction(()=>window.__ripple.state.level.number===3);
+  assert.equal(await guide.locator('#feedback').isVisible(),true);
+  assert.match(await guide.locator('#feedback').innerText(),/dashed rings/);
   assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.tokens),coins-3);
   await guide.reload();await guide.waitForFunction(()=>window.__ripple?.state.level?.number===3);
   assert.equal(await guide.evaluate(()=>window.__ripple.state.progress.tokens),coins-3);
@@ -94,6 +103,7 @@ try {
   assert.equal(await page.locator('#double-token').isVisible(),true);
   for(let i=0;i<8;i++){await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.getElementById('overlay').contains(document.activeElement)),true);}
   await page.click('#double-token');assert.equal(await page.evaluate(()=>window.__ripple.state.progress.tokens),tokensBeforeBonus-2);
+  assert.match(await page.locator('#result-discovery').innerText(),/Star bonus claimed · \+3 stars/);
   assert.equal(await page.locator('#bonus-options').isVisible(),false);
   assert.equal(await page.evaluate(()=>window.__ripple.state.progress.doubled.l1),true);
   await page.reload();await page.waitForFunction(()=>window.__ripple?.state.phase==='complete');
@@ -112,6 +122,9 @@ try {
   const x=v.x+v.width*64/128, y=v.y+v.height*64/128;
   await page.mouse.move(x+10,y);await page.mouse.down();await page.mouse.move(x+10+v.width*8/128,y);await page.mouse.up();
   assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),72);checks.push('Dragging respects the original grab offset');
+  await page.mouse.move(v.x+v.width*72/128,y);await page.mouse.down();await page.mouse.move(-100,y,{steps:8});await page.mouse.up();
+  assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),72);
+  assert.match(await page.locator('#feedback').innerText(),/Keep stones in the lake/);
   await page.mouse.click(v.x+v.width*72/128,y,{button:'right'});assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),0);
   await page.click('#undo');assert.equal(await page.evaluate(()=>window.__ripple.state.stones[0].x),72);
   await page.click('#reset');assert.equal(await page.evaluate(()=>window.__ripple.state.stones.length),0);

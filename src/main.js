@@ -111,11 +111,15 @@ function applyPreferences() {
   $('setting-dock').checked = preferences.dockTop;
 }
 let feedbackTimer;
-function setInstruction(text, visible = false) {
+function setInstruction(text, visible = false, persistent = false) {
   if ($('instruction').textContent !== text) $('instruction').textContent = text;
   clearTimeout(feedbackTimer);
   $('feedback').hidden = !visible;
-  if (visible) { $('feedback').textContent = text; revealPanel($('feedback')); feedbackTimer = setTimeout(()=>{ $('feedback').hidden = true; },4200); }
+  if (visible) {
+    $('feedback').textContent = text;
+    revealPanel($('feedback'));
+    if (!persistent) feedbackTimer = setTimeout(()=>{ $('feedback').hidden = true; },4200);
+  }
 }
 let inventoryTheme, inventorySkin, inventoryArtVersion = -1, previousLit = 0;
 function renderInventory() {
@@ -147,9 +151,9 @@ for (const element of document.querySelectorAll('header,footer,.play-controls,.f
 function defaultInstruction() {
   if (level.number === 1) return 'Place a stone near the lantern. Then drop it.';
   if (level.number === 2) return 'One stone can light both lanterns. Find the middle.';
-  if (level.number === 3) return 'Place outside the gold circles. Let two waves meet.';
-  if (level.number === 7) return 'Ripples reflect from rocks. Use the returning waves.';
-  if (level.number >= C.delayUnlock) return 'Click a stone to set its delay. Right-click to remove.';
+  if (level.number === 3) return 'Place outside the dashed rings. Let two waves meet at the lantern.';
+  if (level.number === 7) return 'Waves reflect from rocks. Use the returning ripples to light the lanterns.';
+  if (level.number >= C.delayUnlock) return 'Click a placed stone to delay its drop. Time waves to meet.';
   return 'Click to place · Drag to move · Right-click to remove';
 }
 function updateTutorialTip() {
@@ -200,7 +204,8 @@ async function enter(newMode = mode) {
   undoStack=[];lastPlacement=stones.map(s=>({...s}));
   pointer = null; hover = null; keyboardPoint = {x:64,y:64}; celebration = 0; renderer.zoom = 0; renderer.resetCamera(); renderer.bursts = []; renderer.failure = null; loading = false; $('loading-status').hidden = true; portal.setLoading(false);
   portal.context({ level: number, mode, dailyStage: mode === 'daily' ? dailyStage + 1 : 0 });
-  applyTheme(); applyPreferences(); setInstruction(defaultInstruction()); refresh(); overlay(); syncPause(); save(); maybeShowWelcome();
+  const newMechanic = mode === 'campaign' && [2,3,7,C.delayUnlock].includes(number) && !progress.stars[`l${number}`] && attempts === 0 && stones.length === 0 && phase === 'ready';
+  applyTheme(); applyPreferences(); setInstruction(defaultInstruction(),newMechanic,newMechanic); refresh(); overlay(); syncPause(); save(); maybeShowWelcome();
   if (mode === 'campaign') fetchLevel(number + 1).catch(() => {});
   if (mode === 'daily' && dailyStage + 1 < C.dailyLength) fetchLevel(C.dailyLevels[dailyStage + 1], (Math.imul(dailyDay,2654435761) + (dailyStage + 1) * 7919) >>> 0, true).catch(() => {});
 }
@@ -277,7 +282,9 @@ function refresh() {
   $('chapter-progress').textContent = mode === 'daily' ? `${new Date(dailyDay * 86400000).toISOString().slice(0,10)} · Shared daily trail` : `${lake.name} · ${solved} of ${C.lakeLength} levels complete`;
   $('app').classList.toggle('is-watching', phase === 'running' || phase === 'celebrate'); $('par').textContent = `PAR ${level.par}`;
   renderInventory();
-  $('attempt-label').textContent = attempts ? `Drop ${attempts}` : 'Take your time'; $('drop').disabled = !stones.length || phase !== 'ready' || paused(); $('reset').disabled = !stones.length || phase !== 'ready' || paused();
+  $('attempt-label').textContent = attempts ? `Drop ${attempts}` : 'Take your time';
+  $('drop').querySelector('span:last-child').textContent = stones.length === 1 ? 'Drop stone' : 'Drop stones';
+  $('drop').disabled = !stones.length || phase !== 'ready' || paused(); $('reset').disabled = !stones.length || phase !== 'ready' || paused();
   $('undo').disabled = !undoStack.length || phase!=='ready' || paused();
   $('mobile-stars').textContent = $('journal-stars').textContent = total;
   $('journal-balance').textContent = progress.tokens;
@@ -326,6 +333,10 @@ function refresh() {
   $('hint-guide').hidden = attempts < C.guidedHelpFailures;
   $('hint-description').textContent = attempts >= C.guidedHelpFailures ? 'Try a complete guided layout, then press Drop to see how its waves work. Your progress and stars are kept.' : allHints ? 'All guide rings are visible. Place a stone in each ring and match its delay. A complete guided layout unlocks after 6 drops.' : attempts >= C.freeHelpFailures ? 'A free ring marks a solution stone. You can reveal more rings without spending coins.' : 'Reveal one solution stone, or keep experimenting. Free rings unlock after 4 drops; a guided layout after 6.';
   $('double').hidden = !(ads && canDouble); $('double-token').hidden = !canDouble; $('double-token').disabled = progress.tokens < 2;
+  if (canDouble) {
+    $('double-token').textContent = `Use 2 coins · +${result.stars} bonus stars`;
+    $('double').textContent = `Watch ad · +${result.stars} bonus stars`;
+  }
   $('bonus-options').hidden = !canDouble;
   if(ads && canDouble) $('bonus-options').open = true;
   const canReroll = !progress.goals.rerolled && !progress.goals.claimed.includes(0);
@@ -360,7 +371,7 @@ function overlay() {
   $('reward-stars').replaceChildren(...Array.from({length:3},(_,i)=>icon('star',i<(result?.stars||3)?'earned':'')));
   $('reward-stars').setAttribute('role','img'); $('reward-stars').setAttribute('aria-label',`${result?.stars||3} of 3 stars`);
   $('overlay-title').textContent = result?.lakeReward ? 'A whole lake alight.' : result?.better ? 'Better than par.' : (result?.stars||3)===3 ? 'A perfect ripple.' : 'The lake is alight.';
-  $('result-stats').replaceChildren(...[[stones.length,'Stones used'],[attempts,'Drops'],[`+${result?.gained||0}`,'Stars earned']].map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
+  $('result-stats').replaceChildren(...[[stones.length,'Stones used'],[attempts,'Drops'],[`${result?.stars || 3} / 3`,'Level stars']].map(([value,label])=>{const cell=document.createElement('div'),n=document.createElement('strong'),text=document.createElement('span');n.textContent=value;text.textContent=label;cell.append(n,text);return cell;}));
   const detail = mode==='daily' ? dailyStage===0 ? `Daily ripple complete${result?.coinsGained?` · +${result.coinsGained} coin`:''}` : dailyStage===C.dailyLength-1 ? `Trail complete${result?.coinsGained?` · +${result.coinsGained} coins`:''}` : 'Trail puzzle complete' : result?.lakeReward ? `Lake complete · +${C.lakeCompletionCoins} coins` : result?.chapterReward ? `Chapter complete · +${C.chapterBonus} stars & ${C.chapterTokens} coins` : result?.first ? '+1 coin' : result?.newRecord ? 'A new personal best.' : 'Best score kept. Try fewer stones.';
   const dailyDone = mode === 'daily' && dailyStage === C.dailyLength - 1;
   $('overlay-text').textContent = `${detail}${dailyDone ? `\n${progress.streak} day trail streak` : mode === 'campaign' && level.number === 3 ? '\nDaily puzzle unlocked. One quick puzzle each day.' : ''}`;
@@ -373,7 +384,8 @@ function overlay() {
     const newCosmetics = [...C.cosmetics.stones, ...C.cosmetics.lanterns].filter(item => item.unlockLevel === progress.level);
     if (newCosmetics.length) rewards.push(`New in Shop · ${newCosmetics.length === 1 ? newCosmetics[0].name : `${newCosmetics.length} items`}`);
   }
-  if (result?.goalBonus) rewards.push(`Daily goals completed · +${result.goalBonus} stars`);
+  if (result?.goalBonus) rewards.push(`Daily goals completed · +${result.goalBonus} bonus stars`);
+  if (progress.doubled[rewardKey()]) rewards.push(`Star bonus claimed · +${result?.stars || 3} stars`);
   if (result?.masteryReward) rewards.unshift(`Chapter mastered · +${C.masteryTokens} coins`);
   $('result-discovery').textContent = rewards.join('\n');
   $('result-discovery').hidden = !$('result-discovery').textContent;
@@ -418,7 +430,7 @@ function tick(dt) {
         const weak = level.lanterns.map((l,i)=>({i,ratio:wave.peak[cell(l.x,l.y)]/C.threshold})).filter(p=>!lit[p.i]).sort((a,b)=>b.ratio-a.ratio)[0];
         renderer.failure=weak?.i ?? null;
         sound.fail();
-        setInstruction(attempts >= C.freeHelpFailures ? `${lit.filter(Boolean).length}/${lit.length} lit. Free guidance is available in Help.` : hint ? 'Two waves meeting make a BIG wave. Try the faint rings.' : weak?.ratio>=.7 ? `${lit.filter(Boolean).length}/${lit.length} lit. The marked lantern is close; shift a stone slightly.` : `${lit.filter(Boolean).length}/${lit.length} lit. Bring two ripples together by the marked lantern.`,true);
+        setInstruction(attempts >= C.freeHelpFailures ? `${lit.filter(Boolean).length}/${lit.length} lit. Free guidance is available in Help.` : hint ? 'Two waves meeting make a bigger wave. Try the faint rings.' : weak?.ratio>=.7 ? `${lit.filter(Boolean).length}/${lit.length} lit. The marked lantern is close; shift a stone slightly.` : `${lit.filter(Boolean).length}/${lit.length} lit. Bring two ripples together by the marked lantern.`,true,true);
         refresh(); save(); break;
       }
     }
@@ -458,7 +470,7 @@ function cancelPointer() {
   if (!pointer) return;
   const { id, index, original } = pointer;
   if (index >= 0 && stones[index]) stones[index] = original;
-  pointer = null; hover = null; canvas.classList.remove('is-panning');
+  pointer = null; hover = null; canvas.classList.remove('is-panning','is-stone','is-moving');
   if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
   if (level) { wave.reset(); lit.fill(false); refresh(); }
 }
@@ -466,11 +478,16 @@ canvas.addEventListener('pointerdown', e => {
   if (pointer || !level || phase !== 'ready' || paused() || (e.pointerType === 'mouse' && e.button !== 0)) return;
   e.preventDefault(); sound.unlock(); touched = true; const p = point(e), v = renderer.view, hitRadius = e.pointerType === 'touch' ? C.touchPixels / 2 : Math.max(C.mouseHitPixels, C.touchRadius * v.size / C.size);
   let index = -1, nearest = hitRadius ** 2; stones.forEach((s,i) => { const d = ((p.x - s.x) * v.width / C.size) ** 2 + ((p.y - s.y) * v.height / C.size) ** 2; if (d <= nearest) { index = i; nearest = d; } });
-  pointer = { id: e.pointerId, start: p, startScreen:{x:e.clientX,y:e.clientY}, lastScreen:{x:e.clientX,y:e.clientY}, offset:index >= 0 ? {x:stones[index].x-p.x,y:stones[index].y-p.y} : {x:0,y:0}, index, original: index >= 0 ? {...stones[index]} : null, moved: false }; canvas.setPointerCapture(e.pointerId);
+  pointer = { id: e.pointerId, start: p, startScreen:{x:e.clientX,y:e.clientY}, lastScreen:{x:e.clientX,y:e.clientY}, offset:index >= 0 ? {x:stones[index].x-p.x,y:stones[index].y-p.y} : {x:0,y:0}, index, original: index >= 0 ? {...stones[index]} : null, moved: false };
+  canvas.classList.toggle('is-moving',index >= 0);
+  canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', e => {
   let p = point(e); if (!level) return;
-  hover = { ...p, valid: canPlace(p,level,stones,pointer?.index ?? -1) };
+  const v = renderer.view;
+  const onStone = stones.some(s => ((p.x-s.x)*v.width/C.size)**2 + ((p.y-s.y)*v.height/C.size)**2 <= Math.max(C.mouseHitPixels,C.touchRadius*v.size/C.size)**2);
+  canvas.classList.toggle('is-stone',onStone && !pointer);
+  hover = onStone ? null : { ...p, valid: canPlace(p,level,stones,pointer?.index ?? -1) };
   if (!pointer || pointer.id !== e.pointerId) return;
   if (distance2({x:e.clientX,y:e.clientY}, pointer.startScreen) > 6 ** 2) pointer.moved = true;
   if (pointer.moved && pointer.index < 0 && e.pointerType === 'mouse') {
@@ -484,15 +501,16 @@ canvas.addEventListener('pointermove', e => {
 });
 canvas.addEventListener('pointerup', e => {
   if (!pointer || e.pointerId !== pointer.id) return;
-  const p = point(e), { index, moved } = pointer;
+  const p = point(e), { index, moved, original } = pointer;
   if (index >= 0) {
-    if (moved) { if (p.x < 0 || p.y < 0 || p.x >= C.size || p.y >= C.size) stones.splice(index,1); }
+    const outside = moved && (p.x < 0 || p.y < 0 || p.x >= C.size || p.y >= C.size);
+    if (outside) { stones[index] = original; wave.reset(); lit.fill(false); refresh(); setInstruction('Keep stones in the lake. Right-click to remove one.',true); }
     else if (level.number >= C.delayUnlock) stones[index].delay = ((stones[index].delay || 0) + 1) % (C.maxDelay + 1);
-    else stones.splice(index,1);
-    edited();
+    if (!outside && (moved || level.number >= C.delayUnlock)) edited();
+    else if (!outside) setInstruction('Drag this stone to move it. Right-click to remove it.',true);
   } else if (!moved && stones.length < level.limit && canPlace(p,level,stones)) { stones.push({ ...p, delay:0 }); edited(); }
   else if (!moved) setInstruction(stones.length >= level.limit ? 'All stones placed. Move one, or right-click to remove it.' : 'Choose open water outside the protected circles.',true);
-  pointer = null; canvas.classList.remove('is-panning'); if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  pointer = null; canvas.classList.remove('is-panning','is-moving'); if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
 });
 canvas.addEventListener('wheel', e => {
   if (!level || adPaused || dialogOpen()) return;
@@ -501,7 +519,7 @@ canvas.addEventListener('wheel', e => {
 }, {passive:false});
 canvas.addEventListener('pointercancel', e => { if (pointer?.id === e.pointerId) cancelPointer(); });
 canvas.addEventListener('lostpointercapture', e => { if (pointer?.id === e.pointerId) cancelPointer(); });
-canvas.addEventListener('pointerleave', () => { hover = null; });
+canvas.addEventListener('pointerleave', () => { hover = null; canvas.classList.remove('is-stone'); });
 canvas.addEventListener('contextmenu',e=>{
   if(!level || phase!=='ready' || paused())return;
   e.preventDefault();cancelPointer();const p=point(e),v=renderer.view;

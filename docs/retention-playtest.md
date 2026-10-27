@@ -2,6 +2,14 @@
 
 This release changes puzzle pacing and rewards. It has **no measured human retention yet**. The earlier 300-puzzle blind bot benchmark used the previous difficulty profiles, and neither its search attempts nor automated solution checks predict human enjoyment.
 
+## Player-first walkthrough
+
+At a 1216 × 684 CrazyGames-sized desktop frame, the first level can be solved with one stone and the next level starts immediately. The review found three trust breaks in that path: clicking an existing stone silently deleted it despite the drag/right-click instructions; the first result displayed seven “stars earned” even though the level awarded three stars and two daily goals supplied four bonus stars; and instructions for new mechanics existed only in screen-reader text. A failed attempt also hid its advice after 4.2 seconds, before a player might finish watching the water.
+
+The game now treats an existing stone as draggable, gives a short pointer cue on click, and reserves right-click or Delete for removal. Dragging a stone beyond the lake restores it instead of silently deleting it. Results show the level rating separately from daily and optional bonus stars. A short, persistent tip appears when players first meet a two-lantern puzzle, protected rings, rock reflections, or delayed stones; it clears when they edit the lake. Failure advice remains visible until the next interaction. These changes follow [Apple's Designing for games › Jump into gameplay](../.agents/skills/apple-design/references/hig/designing-for-games.md), [Onboarding › Best practices](../.agents/skills/apple-design/references/hig/onboarding.md), [Feedback › Best practices](../.agents/skills/apple-design/references/hig/feedback.md), and [Accessibility › Cognitive](../.agents/skills/apple-design/references/hig/accessibility.md) as web-game interaction principles.
+
+Automated checks cover first-run placement and results, pointer movement/removal, failure recovery, chapter and daily rewards, Collection, settings, and desktop layouts from 800 × 450 to Full HD. They verify function and layout, not enjoyment or retention. The uncoached sessions below are still needed before describing the pacing or return loop as successful.
+
 ## Uncoached sessions before submission
 
 Ask 5–8 people unfamiliar with Ripple to play in a CrazyGames-sized desktop frame, with mouse and sound at their own preference. Give only “play as you normally would.” Watch the first 15–20 minutes without helping. Record time and count for the first stone, first drop, first successful level, levels 3/7/10/15 reached, failed drops per level, hints opened, pauses, shop visits, daily puzzle started/completed, and voluntary continuation after the first daily puzzle. Record their own words when they stop or feel stuck. Do not label a level “easy” or “hard” based only on the certificate or a bot run.
