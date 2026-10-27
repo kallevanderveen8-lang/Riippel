@@ -197,6 +197,7 @@ async function enter(newMode = mode) {
   const seed = mode === 'daily' ? (Math.imul(dailyDay, 2654435761) + dailyStage * 7919) >>> 0 : number * 7919;
   const legacy = !!(restore && saved.seed !== undefined && (saved.generatorVersion ?? 1) === 1 && number > SCRIPTED.length);
   level = await fetchLevel(number, seed, mode === 'daily', legacy); level.generatorVersion = legacy ? 1 : 2; wave = new Wave(level.rocks);
+  wave.peakIndices = level.lanterns.map(l => cell(l.x,l.y));
   stones = restore && Array.isArray(saved.stones) ? saved.stones.slice(0, level.limit).map(s => ({ x: Math.round(Number(s.x)), y: Math.round(Number(s.y)), delay: Math.max(0, Math.min(C.maxDelay, Math.floor(Number(s.delay) || 0))) })).filter((s,i,all) => Number.isFinite(s.x) && Number.isFinite(s.y) && canPlace(s, level, all.slice(0,i))) : [];
   lit = level.lanterns.map(() => false); attempts = restore ? Number(saved.attempts) || 0 : 0; resetUsed = restore ? !!saved.resetUsed : false;
   elapsed = restore ? Number(saved.elapsed) || 0 : 0; hintCount = restore ? Number(saved.hintCount) || 0 : 0; result = restore ? saved.result : null;
@@ -206,7 +207,12 @@ async function enter(newMode = mode) {
   portal.context({ level: number, mode, dailyStage: mode === 'daily' ? dailyStage + 1 : 0 });
   const newMechanic = mode === 'campaign' && [2,3,7,C.delayUnlock].includes(number) && !progress.stars[`l${number}`] && attempts === 0 && stones.length === 0 && phase === 'ready';
   applyTheme(); applyPreferences(); setInstruction(defaultInstruction(),newMechanic,newMechanic); refresh(); overlay(); syncPause(); save(); maybeShowWelcome();
-  if (mode === 'campaign') fetchLevel(number + 1).catch(() => {});
+  if (mode === 'campaign') {
+    fetchLevel(number + 1).catch(() => {});
+    const nextLake=lakeForLevel(number+1);
+    if(nextLake.group!==lakeForLevel(number).group)renderer.preloadLake(nextLake.theme);
+    if(number===6)renderer.preloadBoulder();
+  }
   if (mode === 'daily' && dailyStage + 1 < C.dailyLength) fetchLevel(C.dailyLevels[dailyStage + 1], (Math.imul(dailyDay,2654435761) + (dailyStage + 1) * 7919) >>> 0, true).catch(() => {});
 }
 function renderGoals(target) {
@@ -239,8 +245,9 @@ function renderDiscoveries() {
     target.append(card);
   }
 }
+let shopPreviewGeneration=0;
 function renderShop() {
-  const target=$('shop-items');target.replaceChildren();
+  const target=$('shop-items'),previews=[],generation=++shopPreviewGeneration;target.replaceChildren();
   for(const [kind,label] of [['stones','Stones'],['lanterns','Lanterns']]) {
     const group=document.createElement('section'),heading=document.createElement('h3'),grid=document.createElement('div');
     group.className='shop-group';heading.textContent=label;grid.className='shop-grid';group.append(heading,grid);
@@ -249,7 +256,14 @@ function renderShop() {
       const locked=progress.level<(item.unlockLevel||1);
       const card=document.createElement('div'),image=document.createElement('img'),meta=document.createElement('div'),name=document.createElement('strong'),type=document.createElement('small'),button=document.createElement('button');
       card.className='shop-card';card.dataset.item=item.id;card.classList.toggle('equipped',selected);card.classList.toggle('locked',locked);card.classList.toggle('collector',item.kind==='Collector');
-      image.src=renderer.cosmeticPreview(kind,item.id);image.alt='';name.textContent=item.name;type.textContent=locked?`${item.kind} · ${item.cost} coins`:item.kind;meta.append(name,type);
+      image.alt='';image.loading='lazy';
+      const cached=renderer.cachedCosmeticPreview(kind,item.id);
+      if(cached)image.src=cached;
+      else {
+        image.src='data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
+        previews.push(()=>{if(image.isConnected)image.src=renderer.cosmeticPreview(kind,item.id);});
+      }
+      name.textContent=item.name;type.textContent=locked?`${item.kind} · ${item.cost} coins`:item.kind;meta.append(name,type);
       button.textContent=selected?'Equipped':owned?'Equip':locked?`Level ${item.unlockLevel}`:`${item.cost} coins`;
       button.disabled=selected||locked||(!owned&&progress.tokens<item.cost);button.setAttribute('aria-label',`${selected?'Equipped':owned?'Equip':locked?`Unlocks at level ${item.unlockLevel}`:`Buy for ${item.cost} coins`}: ${item.name}`);
       button.onclick=()=>{
@@ -262,6 +276,16 @@ function renderShop() {
       card.append(image,meta,button);grid.append(card);
     }
     target.append(group);
+  }
+  if(previews.length) {
+    let next=0;
+    const fill=()=>{
+      if(generation!==shopPreviewGeneration || journalTab!=='shop' || !$('collection-dialog').open)return;
+      previews[next++]();
+      if(next<previews.length)schedule();
+    };
+    const schedule=()=>typeof requestIdleCallback==='function'?requestIdleCallback(fill,{timeout:200}):setTimeout(fill,24);
+    schedule();
   }
 }
 let rewardToastTimer;
@@ -443,15 +467,44 @@ function tick(dt) {
     for (let s = 0; s < C.stepsPerTick; s++) if (wave.stepNumber < C.visualTailSteps) wave.step();
   }
 }
+let lastRender = -Infinity, renderSamples = 0, renderCost = 0, slowRenders = 0, waterQualityStep = 0, fastBatches = 0;
 function frame(now) {
   const dt = Math.min(C.maxFrameDelta, (now - last) / 1000); last = now;
   sound.update(phase);
-  if (level && !paused()) { accumulator += dt; while (accumulator >= 1 / C.tickHz) { tick(1 / C.tickHz); accumulator -= 1 / C.tickHz; } }
-  if (wave && level) {
+  const resting=paused();
+  if (level && !resting) { accumulator += dt; while (accumulator >= 1 / C.tickHz) { tick(1 / C.tickHz); accumulator -= 1 / C.tickHz; } }
+  const renderInterval = resting ? 1000 / 3 : phase === 'complete' ? 1000 / 30 : 1000 / 72;
+  if (wave && level && now - lastRender >= renderInterval - 1) {
+    lastRender = now;
     if (inventoryArtVersion !== renderer.artVersion) renderInventory();
     const tutorialHints = level.number >= 3 && level.number <= 5 && attempts >= C.hintFailures;
     const hints = phase === 'ready' ? level.solution.slice(0, tutorialHints ? level.solution.length : hintCount) : [];
+    const existingMap = renderer.photoMap, proceduralReady = renderer.cachedTheme === renderer.theme;
+    const drawStart = performance.now();
     renderer.draw(wave, level, stones, lit, globalTime, phase === 'running' || phase === 'celebrate' || phase === 'complete', hints, hover);
+    if (!resting && phase !== 'complete' && (existingMap && existingMap === renderer.photoMap || proceduralReady && renderer.cachedTheme === renderer.theme)) {
+      renderCost += performance.now() - drawStart; renderSamples++;
+      if (dt > .032 && dt < .11) slowRenders++;
+      if (renderSamples >= 20) {
+        const meanCost=renderCost/renderSamples;
+        if(meanCost>7.5 || slowRenders>=8) {
+          fastBatches=0;
+          if(waterQualityStep<3) {
+            renderer.setWaterResolution([360,280,240][waterQualityStep]);
+            if(waterQualityStep===1)renderer.setRenderScale(.75);
+            if(waterQualityStep===2)renderer.setRenderScale(.6);
+            waterQualityStep++;
+          }
+        } else if(waterQualityStep>0 && meanCost<5 && slowRenders<=1 && ++fastBatches>=6) {
+          waterQualityStep--;
+          renderer.setWaterResolution([C.render.waterResolution,360,280][waterQualityStep]);
+          if(waterQualityStep===2)renderer.setRenderScale(.75);
+          if(waterQualityStep===1)renderer.setRenderScale(1);
+          fastBatches=0;
+        } else if(meanCost>=5 || slowRenders>1)fastBatches=0;
+        renderCost = 0; renderSamples = 0; slowRenders = 0;
+      }
+    }
     $('hint-finger').style.left = `${renderer.view.x + renderer.view.width / 2}px`; $('hint-finger').style.top = `${renderer.view.y + renderer.view.height / 2}px`;
     $('hint-finger').classList.toggle('visible', level.number === 1 && mode === 'campaign' && !progress.stars.l1 && stones.length === 0 && elapsed > 5 && phase === 'ready' && !paused());
     if (debug) $('debug').textContent = `Ripple · ${mode}\nLake ${level.number} | ${phase}${paused() ? ' (paused)' : ''}\nAttempts ${attempts} | session drops ${drops}\nActive time ${elapsed.toFixed(1)} s\nGeneration ${level.generationMs.toFixed(1)} ms\nStep ${wave.stepNumber} / ${C.steps} | T ${C.threshold}\nPeaks ${level.lanterns.map(l => wave.peak[cell(l.x,l.y)].toFixed(4)).join(' / ')}\nFPS ~${Math.round(1 / Math.max(.001,dt))} | seed ${level.seed}`;
@@ -618,7 +671,6 @@ function openCollection() {
   if (phase === 'running' || phase === 'celebrate' || adPaused || loading) return;
   renderLakeList();
   renderDiscoveries();
-  renderShop();
   applyTheme();
   action('continue-journey',`Play level ${String(progress.level).padStart(2,'0')}`,'arrow-right');
   if (!$('collection-dialog').open) { showJournalTab(journalTab); $('collection-dialog').showModal(); revealPanel($('collection-dialog')); } syncPause(); refresh();
@@ -671,6 +723,7 @@ $('continue-journey').onclick = async () => {
 };
 function showJournalTab(name, focus = false) {
   journalTab = name;
+  if(name==='shop')renderShop();
   for (const tab of document.querySelectorAll('[data-panel]')) {
     const selected = tab.dataset.panel === name;
     tab.setAttribute('aria-selected',String(selected)); tab.tabIndex = selected ? 0 : -1;
@@ -690,7 +743,7 @@ for (const [index,tab] of journalTabs.entries()) {
   };
 }
 $('journal-daily').onclick = async () => { if (loading || adPaused || (mode!=='daily'&&progress.level<=C.dailyUnlock)) return; $('collection-dialog').close(); manualPause = false; if(mode!=='daily'&&progress.dailyResults[daySeed()]?.trail){save();progress.daily={day:daySeed(),stage:0};level=null;} await enter(mode==='daily'?'campaign':'daily'); };
-$('claim-daily').onclick = () => { const gift=claimDailyGift(progress);if(!gift)return;save();refresh();renderDiscoveries();renderShop();showRewardToast(`Day ${gift.streak} reward`,`+${gift.reward} coins`); };
+$('claim-daily').onclick = () => { const gift=claimDailyGift(progress);if(!gift)return;save();refresh();renderDiscoveries();showRewardToast(`Day ${gift.streak} reward`,`+${gift.reward} coins`); };
 for(const button of $('theme-options').querySelectorAll('button'))button.onclick=()=>{if(setLakeLight(progress,activeLakeNumber(),button.dataset.light)){applyTheme();save();showRewardToast(button.dataset.light==='day'?'Daylight selected':'Nightfall selected',lakeForLevel(activeLakeNumber()).name);} };
 $('journal-back').onclick = () => $('collection-dialog').close();
 $('close-dialog').onclick = () => $('collection-dialog').close(); $('collection-dialog').addEventListener('close', () => { syncPause(); refresh(); });
@@ -698,7 +751,7 @@ document.addEventListener('visibilitychange', () => { hidden = document.hidden; 
 function keyboardHover() {
   hover = {...keyboardPoint,valid:canPlace(keyboardPoint,level,stones),keyboard:true};
   const index = stones.findIndex(s=>distance2(s,keyboardPoint)<C.touchRadius**2);
-  $('keyboard-status').textContent = `Position ${keyboardPoint.x}, ${keyboardPoint.y}. ${index>=0 ? `Stone ${index+1}, delay ${stones[index].delay||0} seconds. Enter to edit, Delete to remove.` : hover.valid ? 'Open water. Enter to place.' : 'Protected water. Choose another spot.'}`;
+  $('keyboard-status').textContent = `Position ${keyboardPoint.x}, ${keyboardPoint.y}. ${index>=0 ? `Stone ${index+1}, delay ${stones[index].delay||0} seconds. ${level.number>=C.delayUnlock?'Enter to change delay. ':''}Delete to remove.` : hover.valid ? 'Open water. Enter to place.' : 'Protected water. Choose another spot.'}`;
 }
 canvas.addEventListener('focus',()=>{ if(level && phase==='ready') keyboardHover(); });
 canvas.addEventListener('blur',()=>{ if(hover?.keyboard) hover=null; });
@@ -719,7 +772,11 @@ document.addEventListener('keydown', e => {
   e.preventDefault(); if(e.repeat) return;
   sound.unlock();
   const index = stones.findIndex(s=>distance2(s,keyboardPoint)<C.touchRadius**2);
-  if (index>=0) { if(e.key==='Enter'&&level.number>=C.delayUnlock) stones[index].delay=((stones[index].delay||0)+1)%(C.maxDelay+1); else stones.splice(index,1); edited(); }
+  if (index>=0) {
+    if(e.key==='Enter'&&level.number>=C.delayUnlock) { stones[index].delay=((stones[index].delay||0)+1)%(C.maxDelay+1); edited(); }
+    else if(e.key!=='Enter') { stones.splice(index,1); edited(); }
+    else setInstruction('Use Delete to remove this stone, then choose a new place.',true);
+  }
   else if(e.key==='Enter' && stones.length<level.limit && canPlace(keyboardPoint,level,stones)) { stones.push({...keyboardPoint,delay:0}); edited(); }
   keyboardHover();
 });
@@ -747,7 +804,7 @@ portal.init().then(async () => {
 });
 // Explicit test-only harness; production URL exposes no solution controls.
 if (new URLSearchParams(location.search).has('test')) window.__ripple = {
-  get state() { return {mode,dailyDay,dailyStage,view:renderer.view,level,stones,lit,phase,attempts,progress,elapsed,paused:paused(),step:wave.stepNumber}; },
+  get state() { return {mode,dailyDay,dailyStage,view:renderer.view,level,stones,lit,phase,attempts,progress,elapsed,paused:paused(),step:wave.stepNumber,waterResolution:renderer.waterResolution}; },
   solve() { stones = level.solution.map(s=>({...s})); edited(); drop(); },
   place(value) { stones = value; edited(); }, drop,
   async go(number) { progress.campaign = {number}; level = null; await enter('campaign'); },

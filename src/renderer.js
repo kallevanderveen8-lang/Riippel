@@ -74,13 +74,16 @@ function photoMask(theme,image) {
 }
 const atlas = new Image();
 let artVersion = 0;
+let atlasFailed = false;
 atlas.onload = () => { rockCache.clear(); artVersion++; };
+atlas.onerror = () => { atlasFailed = true; rockCache.clear(); artVersion++; };
 atlas.src = artURL('assets/stone-atlas.webp');
 const boulder = new Image();
-boulder.src = artURL('assets/boulder.webp');
+let boulderRequested = false;
+function requestBoulder() { if (!boulderRequested) { boulderRequested = true; boulder.src = artURL('assets/boulder.webp'); } }
 function rocksFor(theme) {
-  if (!rockCache.has(theme.stone)) rockCache.set(theme.stone, Array.from({ length: C.render.stoneVariants }, (_, i) => {
-    if (!atlas.complete || !atlas.naturalWidth) return stoneTexture(71 + i * 29, C.render.stoneTexture, theme.stone);
+  if (!rockCache.has(theme.stone)) rockCache.set(theme.stone, Array.from({ length: !atlas.naturalWidth && !atlasFailed ? 1 : C.render.stoneVariants }, (_, i) => {
+    if (!atlas.naturalWidth) return stoneTexture(71 + i * 29, atlasFailed ? C.render.stoneTexture : 64, theme.stone);
     const side = atlas.height, canvas = surface(512), ctx = canvas.getContext('2d');
     ctx.translate(256, 256); ctx.rotate((i % 3 - 1) * .11);
     ctx.drawImage(atlas, (i % 3) * side, 0, side, side, -248, -248, 496, 496);
@@ -92,39 +95,67 @@ function rocksFor(theme) {
 export class Renderer {
   constructor(canvas, { theme = C.themes[0], preview = false } = {}) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d');
+    if(!preview) { this.rockCanvas=surface(1,1);this.rockCanvas.id='rock-layer';canvas.after(this.rockCanvas);this.rockCtx=this.rockCanvas.getContext('2d'); }
     this.off = surface(1); this.octx = this.off.getContext('2d');
     this.theme = theme; this.preview = preview; this.bursts = []; this.zoom = 0; this.cachedTheme = null; this.thumbnails = new Map();
-    this.timeOfDay='day';this.cosmetics={stone:'river',lantern:'bronze'};this.cosmeticCache=new Map();
+    this.timeOfDay='day';this.cosmetics={stone:'river',lantern:'bronze'};this.cosmeticCache=new Map();this.cosmeticURLs=new Map();
     const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
     this.motionPreference = motionPreference; this.userReduced = false;
     this.reduced = preview || motionPreference.matches;
     if (!preview) motionPreference.addEventListener('change',event=>{ this.reduced=this.userReduced || event.matches; });
     this.sines = Float32Array.from({ length: 2048 }, (_, i) => Math.sin(i / 2048 * Math.PI * 2));
+    this.waterResolution = C.render.waterResolution;
+    this.renderScale = 1;
     this.cameraScale = preview ? 1 : 1.08;
     this.view = { x: 0, y: 0, size: 1 };
     this.normalX = new Float32Array(C.size * C.size); this.normalY = new Float32Array(C.size * C.size);
+    this.photoMap = null;
     if (!preview) new ResizeObserver(() => this.resize()).observe(canvas);
+    lakeImage(this.theme);
     this.resize();
   }
   resize() {
-    const rect = this.preview ? this.canvas : this.canvas.getBoundingClientRect(), dpr = this.preview ? 1 : Math.min(devicePixelRatio || 1, C.render.dpr, 2048 / rect.width, 1152 / rect.height);
+    const rect = this.preview ? this.canvas : this.canvas.getBoundingClientRect(), dpr = this.preview ? 1 : Math.min(devicePixelRatio || 1, C.render.dpr, 2048 / rect.width, 1152 / rect.height) * this.renderScale;
     if (!rect.width || !rect.height) return;
     const oldWidth = this.width, oldHeight = this.height;
     const centerX = this.view.width ? (oldWidth / 2 - this.view.x) / this.view.width : .5;
     const centerY = this.view.height ? (oldHeight / 2 - this.view.y) / this.view.height : .5;
     this.width = rect.width; this.height = rect.height; this.dpr = dpr;
     this.canvas.width = Math.round(rect.width * dpr); this.canvas.height = Math.round(rect.height * dpr);
+    if(this.rockCanvas) {
+      this.rockDpr=Math.min(devicePixelRatio||1,C.render.dpr,2048/rect.width,1152/rect.height);
+      this.rockCanvas.width=Math.round(rect.width*this.rockDpr);
+      this.rockCanvas.height=Math.round(rect.height*this.rockDpr);
+      this.rockProjection=null;
+    }
     // Camera movement changes only the projection, never the physical puzzle.
     this.view = { x: rect.width * (.5 - centerX * this.cameraScale), y: rect.height * (.5 - centerY * this.cameraScale), width: rect.width * this.cameraScale, height: rect.height * this.cameraScale, size: Math.min(rect.width, rect.height) * this.cameraScale };
     this.clampCamera();
-    const scale = Math.min(1, C.render.waterResolution / Math.max(rect.width, rect.height));
-    this.off.width = Math.ceil(rect.width * scale); this.off.height = Math.ceil(rect.height * scale);
-    this.image = this.octx.createImageData(this.off.width, this.off.height);
-    this.buildScene();
+    this.allocateWater();
+    this.cachedTheme = null;
+  }
+  allocateWater() {
+    const scale=Math.min(1,this.waterResolution/Math.max(this.width,this.height));
+    const w=Math.ceil(this.width*scale),h=Math.ceil(this.height*scale);
+    if(this.off.width===w && this.off.height===h && this.image)return;
+    this.off.width=w;this.off.height=h;
+    this.image=this.octx.createImageData(w,h);
+    this.photoMap=null;this.cachedTheme=null;
+  }
+  setWaterResolution(value) {
+    if(this.preview || this.waterResolution===value)return;
+    this.waterResolution=value;
+    this.allocateWater();
+  }
+  setRenderScale(value) {
+    if(this.preview || this.renderScale===value)return;
+    this.renderScale=value;this.resize();
   }
   thumbnail(theme) {
     return artURL(theme.art.replace('assets/', 'assets/thumb-'));
   }
+  preloadLake(theme) { lakeImage(theme); }
+  preloadBoulder() { requestBoulder(); }
   setReducedMotion(value) { this.userReduced = !!value; this.reduced = this.preview || this.userReduced || this.motionPreference.matches; }
   clampCamera() {
     const v = this.view;
@@ -155,7 +186,8 @@ export class Renderer {
     return stone.previewURL;
   }
   stoneFor(index=0,id=this.cosmetics.stone) {
-    const base=rocksFor(this.theme)[(index+5)%C.render.stoneVariants];
+    this.ensureCosmeticCache();
+    const rocks=rocksFor(this.theme),base=rocks[(index+5)%rocks.length];
     if(id==='river')return base;
     const key=`${this.theme.name}:${index}:${id}:${artVersion}`;
     if(this.cosmeticCache.has(key))return this.cosmeticCache.get(key);
@@ -185,12 +217,26 @@ export class Renderer {
     this.cosmeticCache.set(key,c);return c;
   }
   cosmeticPreview(kind,id) {
-    if(kind==='stones')return this.stoneFor(0,id).toDataURL();
-    const c=surface(160),ctx=c.getContext('2d');ctx.translate(80,80);ctx.scale(23,23);
-    const previous=this.cosmetics;this.cosmetics={...previous,lantern:id};
-    this.lantern(ctx,{x:0,y:0},true,0,0,{stepNumber:0});this.cosmetics=previous;
-    return c.toDataURL();
+    this.ensureCosmeticCache();
+    const key=this.cosmeticPreviewKey(kind,id);
+    if(this.cosmeticURLs.has(key))return this.cosmeticURLs.get(key);
+    let url;
+    if(kind==='stones')url=this.stoneFor(0,id).toDataURL();
+    else {
+      const c=surface(160),ctx=c.getContext('2d');ctx.translate(80,80);ctx.scale(23,23);
+      const previous=this.cosmetics;this.cosmetics={...previous,lantern:id};
+      this.lantern(ctx,{x:0,y:0},true,0,0,{stepNumber:0});this.cosmetics=previous;
+      url=c.toDataURL();
+    }
+    this.cosmeticURLs.set(key,url);
+    return url;
   }
+  ensureCosmeticCache() {
+    if(this.cosmeticTheme===this.theme && this.cosmeticArtVersion===artVersion)return;
+    this.cosmeticCache.clear();this.cosmeticURLs.clear();this.cosmeticTheme=this.theme;this.cosmeticArtVersion=artVersion;
+  }
+  cosmeticPreviewKey(kind,id) { return `${this.theme.name}:${kind}:${id}:${artVersion}`; }
+  cachedCosmeticPreview(kind,id) { this.ensureCosmeticCache();return this.cosmeticURLs.get(this.cosmeticPreviewKey(kind,id)); }
   get artVersion() { return artVersion; }
   point(clientX, clientY) {
     const r = this.canvas.getBoundingClientRect(), v = this.view;
@@ -287,38 +333,53 @@ export class Renderer {
     }
   }
   burst(x, y, time) { this.bursts.push({ x, y, time }); }
+  preparePhotoMap(level, photo) {
+    const w=this.off.width,h=this.off.height,v=this.view,old=this.photoMap;
+    if(old && old.level===level && old.theme===this.theme && old.w===w && old.h===h && old.x===v.x && old.y===v.y && old.vw===v.width && old.vh===v.height) return old;
+    const mask=photoMask(this.theme,photo), size=w*h, cells=new Uint16Array(size), fx=new Float32Array(size), fy=new Float32Array(size), alpha=new Uint8Array(size), rocks=level.rocks;
+    cells.fill(65535);
+    for(let y=0;y<h;y++) {
+      const gy=(y/h*this.height-v.y)/v.height*C.size,iy=Math.floor(gy),fractionY=gy-iy;
+      const my=Math.max(0,Math.min(mask.height-1,Math.round(gy/C.size*mask.height)));
+      for(let x=0;x<w;x++) {
+        const i=y*w+x,gx=(x/w*this.width-v.x)/v.width*C.size,ix=Math.floor(gx);
+        if(ix>0 && ix<126 && iy>0 && iy<126) {cells[i]=iy*C.size+ix;fx[i]=gx-ix;fy[i]=fractionY;}
+        let dry=false;
+        for(const r of rocks) if(((gx-r.x)/(r.rx*1.05))**2+((gy-r.y)/(r.ry*1.05))**2<1){dry=true;break;}
+        if(!dry) {
+          const mx=Math.max(0,Math.min(mask.width-1,Math.round(gx/C.size*mask.width)));
+          alpha[i]=mask.alpha[my*mask.width+mx];
+        }
+      }
+    }
+    this.photoMap={level,theme:this.theme,w,h,x:v.x,y:v.y,vw:v.width,vh:v.height,cells,fx,fy,alpha};
+    return this.photoMap;
+  }
   photoWater(wave, time, level, running,photo) {
     const w = this.off.width, h = this.off.height, data = this.image.data, field = wave.h;
     const normalX = this.normalX, normalY = this.normalY;
-    for (let y = 1; y < 127; y++) for (let x = 1; x < 127; x++) {
+    if(running) for (let y = 1; y < 127; y++) for (let x = 1; x < 127; x++) {
       const p = y * 128 + x;
-      normalX[p] = running ? field[p + 1] - field[p - 1] : 0; normalY[p] = running ? field[p + 128] - field[p - 128] : 0;
+      normalX[p] = field[p + 1] - field[p - 1]; normalY[p] = field[p + 128] - field[p - 128];
     }
-    const v = this.view,mask=photoMask(this.theme,photo);
+    const map=this.preparePhotoMap(level,photo);
     for (let y = 0; y < h; y++) {
-      const gy = (y / h * this.height - v.y) / v.height * 128, iy = Math.floor(gy), fy = gy - iy;
       for (let x = 0; x < w; x++) {
-        const p = (y * w + x) * 4, gx = (x / w * this.width - v.x) / v.width * 128, ix = Math.floor(gx), fx = gx - ix;
+        const i=y*w+x,p=i*4,c=map.cells[i];
         let nx = 0, ny = 0;
-        if (ix > 0 && ix < 126 && iy > 0 && iy < 126) {
-          const c = iy * 128 + ix;
+        if (running && c !== 65535) {
+          const fx=map.fx[i],fy=map.fy[i];
           nx = mix(mix(normalX[c], normalX[c + 1], fx), mix(normalX[c + 128], normalX[c + 129], fx), fy);
           ny = mix(mix(normalY[c], normalY[c + 1], fx), mix(normalY[c + 128], normalY[c + 129], fx), fy);
         }
         const light = nx * .7 + ny * .9;
         const shimmer = this.reduced ? 0 : Math.max(0,this.sines[(x*11+y*5-time*350)&2047]*this.sines[(y*13-x*4+time*220)&2047])*.018;
-        // The physical wave solver reflects from rocks; the light pass must
-        // respect the same silhouette so a highlight cannot cross dry stone.
-        const dry=level.rocks.some(r=>((gx-r.x)/(r.rx*1.05))**2+((gy-r.y)/(r.ry*1.05))**2<1);
-        const mx=Math.max(0,Math.min(mask.width-1,Math.round(gx/128*mask.width)));
-        const my=Math.max(0,Math.min(mask.height-1,Math.round(gy/128*mask.height)));
-        const waterAlpha=dry?0:mask.alpha[my*mask.width+mx]/255;
         if (light >= 0) {
           data[p] = 223; data[p + 1] = 245; data[p + 2] = 238;
-          data[p + 3] = waterAlpha*clamp(light * 4.2 + shimmer, 0, .23) * 255;
+          data[p + 3] = map.alpha[i]*clamp(light * 4.2 + shimmer, 0, .23);
         } else {
           data[p] = 4; data[p + 1] = 39; data[p + 2] = 47;
-          data[p + 3] = waterAlpha*clamp(-light * 2.7, 0, .16) * 255;
+          data[p + 3] = map.alpha[i]*clamp(-light * 2.7, 0, .16);
         }
       }
     }
@@ -367,41 +428,22 @@ export class Renderer {
     }
     this.octx.putImageData(this.image, 0, 0);
   }
-  draw(wave, level, stones, lit, time, running, hints = [], hover = null) {
-    if (this.cachedTheme !== this.theme || this.rocksVersion !== artVersion) { this.buildScene(); this.rocksVersion = artVersion; }
-    const photo = lakeImage(this.theme);
-    const activeRipples = !!photo;
-    if (activeRipples) this.photoWater(wave, time,level,running&&wave.stepNumber>0,photo);
-    else if (!photo) this.water(wave, time);
-    const ctx = this.ctx, W = this.width, H = this.height, v = this.view, scale = v.size / C.size;
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const art = photo ? `${artURL(this.theme.art)}:${this.timeOfDay}` : '';
-    if (this.displayedArt !== art) {
-      this.canvas.style.backgroundImage = art ? `${this.timeOfDay==='night'?'linear-gradient(#0419278c,#072139a3)':'linear-gradient(to bottom, transparent 65%, #15263248)'}, url("${artURL(this.theme.art)}")` : '';
-      this.displayedArt = art;
-    }
-    this.canvas.style.backgroundSize = `100% 100%, ${v.width}px ${v.height}px`;
-    this.canvas.style.backgroundPosition = `0 0, ${v.x}px ${v.y}px`;
-    if (activeRipples || !photo) ctx.drawImage(this.off, 0, 0, W, H);
-    ctx.save();
-    if (this.zoom && !this.reduced) { const z = 1 + this.zoom * .014; ctx.translate(v.x + v.width / 2, v.y + v.height / 2); ctx.scale(z, z); ctx.translate(-v.x - v.width / 2, -v.y - v.height / 2); }
-    ctx.translate(v.x, v.y); ctx.scale(v.width / C.size, v.height / C.size);
-    if (!running && level.clearance) for (const l of level.lanterns) {
-      ctx.beginPath();ctx.arc(l.x,l.y,level.clearance,0,Math.PI*2);ctx.setLineDash([.75,1.1]);
-      ctx.strokeStyle='#092a35a8';ctx.lineWidth=.48;ctx.stroke();
-      ctx.strokeStyle='#fff9dfdc';ctx.lineWidth=.22;ctx.stroke();ctx.setLineDash([]);
-    }
-    for (let i = 0; i < level.rocks.length; i++) {
-      const r = level.rocks[i];
+  rocksLayer(level) {
+    requestBoulder();
+    const photographic=boulder.complete&&boulder.naturalWidth;
+    const size=Math.min(2048,Math.max(1024,Math.ceil(this.width*(this.rockDpr||this.dpr))));
+    if(this.rockLayer && this.rockLayerLevel===level && this.rockLayerTheme===this.theme && this.rockLayerLight===this.timeOfDay && this.rockLayerSize===size && this.rockLayerArt===artVersion && this.rockLayerPhoto===photographic)return this.rockLayer;
+    const layer=surface(size),ctx=layer.getContext('2d');ctx.scale(size/C.size,size/C.size);
+    const rocks=rocksFor(this.theme);
+    for(let i=0;i<level.rocks.length;i++) {
+      const r=level.rocks[i];
       ctx.save();ctx.translate(r.x,r.y);
-      // A diffused submerged footprint ties the dry top to the water without a hard oval cutout.
       ctx.save();ctx.scale(r.rx,r.ry);
       const depth=ctx.createRadialGradient(.03,.12,.45,.04,.16,1.28);
       depth.addColorStop(0,'#071e22c7');depth.addColorStop(.68,'#0b30379e');depth.addColorStop(1,'#0c414600');
       ctx.fillStyle=depth;ctx.fillRect(-1.3,-1.3,2.6,2.6);ctx.restore();
-      ctx.shadowColor='#051b20a8';ctx.shadowBlur=7*this.dpr;ctx.shadowOffsetX=.7*this.dpr;ctx.shadowOffsetY=2*this.dpr;
-      const art=boulder.complete&&boulder.naturalWidth?boulder:this.rocks[(i+2)%this.rocks.length];
+      ctx.shadowColor='#051b20a8';ctx.shadowBlur=8;ctx.shadowOffsetX=1;ctx.shadowOffsetY=3;
+      const art=photographic?boulder:rocks[(i+2)%rocks.length];
       ctx.save();
       ctx.filter=this.timeOfDay==='night'?'brightness(.72) saturate(.82)':'brightness(.94) saturate(.9)';
       if(r.ry>r.rx*1.2){ctx.rotate(Math.PI/2);ctx.drawImage(art,-r.ry*1.12,-r.rx*1.12,r.ry*2.24,r.rx*2.24);}
@@ -412,6 +454,48 @@ export class Renderer {
       ctx.strokeStyle=this.timeOfDay==='night'?'#91b9c04d':'#bfded06b';ctx.lineWidth=.12;
       ctx.beginPath();ctx.ellipse(0,.09,r.rx*1.02,r.ry*1.02,-.08,.15,Math.PI-.12);ctx.stroke();ctx.restore();
     }
+    this.rockLayer=layer;this.rockLayerLevel=level;this.rockLayerTheme=this.theme;this.rockLayerLight=this.timeOfDay;this.rockLayerSize=size;this.rockLayerArt=artVersion;this.rockLayerPhoto=photographic;
+    return layer;
+  }
+  drawRockOverlay(level) {
+    if(!this.rockCanvas)return;
+    if(!level.rocks.length) {
+      if(this.rockProjection){this.rockCtx.clearRect(0,0,this.rockCanvas.width,this.rockCanvas.height);this.rockProjection=null;}
+      return;
+    }
+    const layer=this.rocksLayer(level),v=this.view,old=this.rockProjection;
+    if(old && old.layer===layer && old.x===v.x && old.y===v.y && old.width===v.width && old.height===v.height)return;
+    const ctx=this.rockCtx;ctx.setTransform(this.rockDpr,0,0,this.rockDpr,0,0);ctx.clearRect(0,0,this.width,this.height);
+    ctx.drawImage(layer,v.x,v.y,v.width,v.height);
+    this.rockProjection={layer,x:v.x,y:v.y,width:v.width,height:v.height};
+  }
+  draw(wave, level, stones, lit, time, running, hints = [], hover = null) {
+    const photo = lakeImage(this.theme);
+    const procedural = !photo && lakeImages.get(this.theme.art).complete;
+    if (procedural && (this.cachedTheme !== this.theme || this.rocksVersion !== artVersion)) { this.buildScene(); this.rocksVersion = artVersion; }
+    if (photo) this.photoWater(wave, time,level,running&&wave.stepNumber>0,photo);
+    else if (procedural) this.water(wave, time);
+    const ctx = this.ctx, W = this.width, H = this.height, v = this.view, scale = v.size / C.size;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    const art = !procedural ? `${artURL(this.theme.art)}:${this.timeOfDay}` : '';
+    if (this.displayedArt !== art) {
+      this.canvas.style.backgroundImage = art ? `${this.timeOfDay==='night'?'linear-gradient(#0419278c,#072139a3)':'linear-gradient(to bottom, transparent 65%, #15263248)'}, url("${artURL(this.theme.art)}")` : '';
+      this.displayedArt = art;
+    }
+    this.canvas.style.backgroundSize = `100% 100%, ${v.width}px ${v.height}px`;
+    this.canvas.style.backgroundPosition = `0 0, ${v.x}px ${v.y}px`;
+    if (photo || procedural) ctx.drawImage(this.off, 0, 0, W, H);
+    ctx.save();
+    if (this.zoom && !this.reduced) { const z = 1 + this.zoom * .014; ctx.translate(v.x + v.width / 2, v.y + v.height / 2); ctx.scale(z, z); ctx.translate(-v.x - v.width / 2, -v.y - v.height / 2); }
+    ctx.translate(v.x, v.y); ctx.scale(v.width / C.size, v.height / C.size);
+    if (!running && level.clearance) for (const l of level.lanterns) {
+      ctx.beginPath();ctx.arc(l.x,l.y,level.clearance,0,Math.PI*2);ctx.setLineDash([.75,1.1]);
+      ctx.strokeStyle='#092a35a8';ctx.lineWidth=.48;ctx.stroke();
+      ctx.strokeStyle='#fff9dfdc';ctx.lineWidth=.22;ctx.stroke();ctx.setLineDash([]);
+    }
+    if(this.rockCanvas)this.drawRockOverlay(level);
+    else if(level.rocks.length)ctx.drawImage(this.rocksLayer(level),0,0,C.size,C.size);
     for (const p of hints) { ctx.strokeStyle = '#f1e5c49e'; ctx.lineWidth = .28; ctx.setLineDash([.7, 1]); ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     if (hover && !running && hover.x >= 7 && hover.x <= 121 && hover.y >= 7 && hover.y <= 121) {
       ctx.strokeStyle = hover.keyboard ? '#fff4d9' : hover.valid ? '#e8e9e187' : '#e4bdac77'; ctx.lineWidth = hover.keyboard ? .45 : .17; ctx.beginPath(); ctx.ellipse(hover.x, hover.y, 3, 3, 0, 0, Math.PI * 2); ctx.stroke();
@@ -439,8 +523,8 @@ export class Renderer {
     if (!this.reduced) for (const b of this.bursts) {
       const age = time - b.time; ctx.strokeStyle = `rgba(242,218,166,${(1 - age / C.burstSeconds) * .24})`; ctx.lineWidth = .2; ctx.beginPath(); ctx.arc(b.x, b.y, 3 + age * 10, 0, Math.PI * 2); ctx.stroke();
     }
-    ctx.restore(); if (!photo) ctx.drawImage(this.foreground, 0, 0, W, H);
-    if (!photo) { const shade = ctx.createLinearGradient(0, H * .65, 0, H); shade.addColorStop(0, '#15263200'); shade.addColorStop(1, '#15263248'); ctx.fillStyle = shade; ctx.fillRect(0, H * .65, W, H * .35); }
+    ctx.restore(); if (procedural) ctx.drawImage(this.foreground, 0, 0, W, H);
+    if (procedural) { const shade = ctx.createLinearGradient(0, H * .65, 0, H); shade.addColorStop(0, '#15263200'); shade.addColorStop(1, '#15263248'); ctx.fillStyle = shade; ctx.fillRect(0, H * .65, W, H * .35); }
     // Draw timing labels in CSS pixels: projecting the lake must not squash its text.
     if (level.number >= C.delayUnlock) {
       const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) * .875;
@@ -452,7 +536,10 @@ export class Renderer {
         const x = clamp(v.x + v.width/2 + (stone.x/C.size-.5)*v.width*zoom, width/2+2, W-width/2-2);
         const offset = Math.max(C.render.placedStoneRadius*scale, C.render.stoneMinPixels/2) + height/2 + 4;
         const y = clamp(v.y + v.height/2 + (stone.y/C.size-.5)*v.height*zoom + (above ? -offset : offset), height/2+2, H-height/2-2);
-        ctx.fillStyle = '#1b2c33'; ctx.beginPath(); ctx.roundRect(x-width/2,y-height/2,width,height,6); ctx.fill();
+        ctx.fillStyle = '#1b2c33'; ctx.beginPath();
+        if(typeof ctx.roundRect==='function')ctx.roundRect(x-width/2,y-height/2,width,height,6);
+        else ctx.rect(x-width/2,y-height/2,width,height);
+        ctx.fill();
         ctx.fillStyle = above ? '#e7c58f' : '#eef3ef'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text,x,y);
       };
       ctx.save();
